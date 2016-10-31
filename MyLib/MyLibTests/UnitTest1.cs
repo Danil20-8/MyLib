@@ -13,7 +13,8 @@ namespace MyLibTests
             CompactSerializer cs = new CompactSerializer();
             string d = cs.Serialize(a);
             Assert.AreEqual("10&", d);
-            Assert.AreEqual(10, cs.Deserialize<int>(d));
+            a = cs.Deserialize<int>(d);
+            Assert.AreEqual(10, a);
         }
         [TestMethod]
         public void TestStringSerialization()

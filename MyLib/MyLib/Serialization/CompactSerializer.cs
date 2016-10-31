@@ -138,32 +138,38 @@ namespace MyLib.Serialization
             sb.Append(splitter);
         }
 
-        public T Deserialize<T>(StreamReader reader, Type binder = null)
-        {
-            return Deserialize<T>(reader.ReadToEnd(), binder);
-        }
-
         public T Deserialize<T>(string source, Type binder = null)
         {
+            using (MemoryStream ms = new MemoryStream(source.Select(c => (byte)c).ToArray()))
+            {
+                using (StreamReader sr = new StreamReader(ms))
+                {
+                    return Deserialize<T>(sr, binder);
+                }
+            }
+        }
+
+        public T Deserialize<T>(StreamReader reader, Type binder = null)
+        {
             int l = 0;
-            includeTypes = TryExtract(ExtractResult.Type, source, l);
+            includeTypes = ((char) reader.Peek()) == ':';
             if (includeTypes)
             {
                 assemblies = GetAssemblies(typeof(T));
-                serializationTypes = (SerializationTypes) Deserialize(typeof(SerializationTypes), null, source, ref l);
+                serializationTypes = (SerializationTypes) Deserialize(typeof(SerializationTypes), null, reader);
             }
 
-            T result = (T)Deserialize(typeof(T), binder, source, ref l);
+            T result = (T)Deserialize(typeof(T), binder, reader);
             return result;
         }
-        object Deserialize(Type ftype, Type binder, string source, ref int l)
+        object Deserialize(Type ftype, Type binder, StreamReader reader)
         {
             SerializeTemp result = null;
 
             if (includeTypes)
             {
                 string sub;
-                Extract(source, ref l, out sub);
+                Extract(reader, out sub);
                 if (sub != "")
                     ftype = GetType(serializationTypes.GetType(int.Parse(sub)));
             }
@@ -183,36 +189,37 @@ namespace MyLib.Serialization
                         elementType = binder.GetGenericArguments().First();
 
                     string line = "";
-                    Extract(source, ref l, out line);
+                    Extract(reader, out line);
                     int length = int.Parse(line);
                     for (int i = 0; i < length; i++)
-                        result.AddField("", Deserialize(elementType, null, source, ref l), SerializeTemp.FieldFlags.Element);
+                        result.AddField("", Deserialize(elementType, null, reader), SerializeTemp.FieldFlags.Element);
                 }
                 else if(binder == typeof(string) && ((options & CSOptions.SafeString) != 0))
                 {
                     string line;
-                    Extract(source, ref l, out line);
+                    Extract(reader, out line);
                     int length = int.Parse(line);
-                    result.AddField("", SubString(source, ref l, l + length), SerializeTemp.FieldFlags.Element);
+                    Extract(reader, out line, length);
+                    result.AddField("", line, SerializeTemp.FieldFlags.Element);
                 }
                 else if (IsComVisible(binder))
                 {
                     string line;
-                    Extract(source, ref l, out line);
+                    Extract(reader, out line);
                     result.AddField("", GetValue(binder, line), SerializeTemp.FieldFlags.Element);
                 }
                 else
                 {
                     foreach (var sa in GetSerializedFields(binder))
-                        result.AddField(sa.Name, Deserialize(sa.fieldType, Bind(sa), source, ref l), SerializeTemp.FieldFlags.Addon);
+                        result.AddField(sa.Name, Deserialize(sa.fieldType, Bind(sa), reader), SerializeTemp.FieldFlags.Addon);
                 }
             }
             else
             {
                 foreach (var ca in GetConstructorArgs(binder))
-                    result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), source, ref l), SerializeTemp.FieldFlags.Arg);
+                    result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), reader), SerializeTemp.FieldFlags.Arg);
                 foreach (var ad in GetAddons(binder))
-                    result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), source, ref l), SerializeTemp.FieldFlags.Addon);
+                    result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), reader), SerializeTemp.FieldFlags.Addon);
             }
 
             return binder == ftype ? result.GetValue() : ((IBinder)result.GetValue()).GetResult();
@@ -462,12 +469,6 @@ namespace MyLib.Serialization
             return ExtractResult.Value;
         }
 
-        bool TryExtract(ExtractResult expected, StreamReader sr)
-        {
-            string sub;
-            return Extract(sr, out sub) == expected;
-        }
-
         ExtractResult Extract(StreamReader sr, out string result)
         {
             StringBuilder r = new StringBuilder();
@@ -491,7 +492,16 @@ namespace MyLib.Serialization
             result = r.ToString();
             return ExtractResult.Value;
         }
-
+        ExtractResult Extract(StreamReader sr, out string result, int length)
+        {
+            StringBuilder r = new StringBuilder();
+            for(int i = 0; i < length && !sr.EndOfStream; i++)
+                r.Append((char)sr.Read());
+            if(!sr.EndOfStream)
+                sr.Read();
+            result = r.ToString();
+            return ExtractResult.Value;
+        }
         enum ExtractResult
         {
             Type,
