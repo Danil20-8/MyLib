@@ -12,7 +12,7 @@ namespace MyLib.Serialization.Binders
         bool _hasValue;
 
         [Addon]
-        string svalue { get { if (rvalue != null) return new CompactSerializer().Serialize(rvalue); else return ""; } set { if (_hasValue) rvalue = new CompactSerializer().Deserialize<T>(value); else rvalue = null; } }
+        string svalue { get { if (rvalue != null) return new CompactSerializer('~').Serialize(rvalue); else return ""; } set { if (_hasValue) rvalue = new CompactSerializer('~').Deserialize<T>(value); else rvalue = null; } }
 
         T rvalue;
 

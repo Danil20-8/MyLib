@@ -14,18 +14,18 @@ namespace MyLibTests
         {
             var tc = new TestClassWithNullField();
             tc.nullField = "Hello";
-            string r = new CompactSerializer(CSOptions.SafeString).Serialize(tc);
-            Assert.AreEqual("1&6&Hello&&", r);
-            Assert.AreEqual("Hello", new CompactSerializer(CSOptions.SafeString).Deserialize<TestClassWithNullField>(r).nullField);
+            string r = new CompactSerializer().Serialize(tc);
+            Assert.AreEqual("1&Hello~&", r);
+            Assert.AreEqual("Hello", new CompactSerializer().Deserialize<TestClassWithNullField>(r).nullField);
         }
         [TestMethod]
         public void TestNullBinderSerializationNull()
         {
             var tc = new TestClassWithNullField();
             tc.nullField = null;
-            string r = new CompactSerializer(CSOptions.SafeString).Serialize(tc);
-            Assert.AreEqual("0&0&&", r);
-            Assert.AreEqual(null, new CompactSerializer(CSOptions.SafeString).Deserialize<TestClassWithNullField>(r).nullField);
+            string r = new CompactSerializer().Serialize(tc);
+            Assert.AreEqual("0&&", r);
+            Assert.AreEqual(null, new CompactSerializer().Deserialize<TestClassWithNullField>(r).nullField);
         }
     }
 
