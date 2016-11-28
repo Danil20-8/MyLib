@@ -49,6 +49,7 @@
     <Compile Include="Modern\Tuple.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serialization\Binders\DictionaryBinder.cs" />
+    <Compile Include="Serialization\Binders\NullBinder.cs" />
     <Compile Include="Serialization\CompactSerializer.cs" />
     <Compile Include="Serialization\General.cs" />
     <Compile Include="Serialization\SerializationInfo.cs" />

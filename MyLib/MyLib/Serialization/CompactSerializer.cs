@@ -12,43 +12,32 @@ namespace MyLib.Serialization
 {
     public class CompactSerializer
     {
-        SerializeBinders binders;
         SerializationTypes serializationTypes;
         bool includeTypes;
         IEnumerable<Assembly> assemblies = new Assembly[0];
         CSOptions options;
         char splitter = '&';
-        public CompactSerializer(CSOptions options, SerializeBinders binders)
-        {
-            this.options = options;
-            this.binders = binders;
-        }
-
         public CompactSerializer(CSOptions options)
         {
             this.options = options;
-            this.binders = new SerializeBinders();
         }
         public CompactSerializer(SerializeBinders binders)
         {
             this.options = CSOptions.None;
-            this.binders = binders;
         }
         public CompactSerializer(char splitter = '&', CSOptions options = CSOptions.None, SerializeBinders binders = null)
         {
             this.splitter = splitter;
             this.options = options;
-            this.binders = binders == null ? new SerializeBinders() : binders;
         }
         public string Serialize(object data, Type binder = null)
         {
             serializationTypes = new SerializationTypes();
             if ((options & CSOptions.WithTypes) != 0)
                 includeTypes = true;
-            else {
+            else if((options & CSOptions.NoTypes) == 0)
+            {
                 includeTypes = !IsSameTypes(data, binder);
-                if (includeTypes && (options & CSOptions.NoTypes) != 0)
-                    throw new Exception(string.Format("{0} contains elements by them base", data));
             }
             var result = Serialize(data, false, binder);
             if (includeTypes)
@@ -67,23 +56,14 @@ namespace MyLib.Serialization
             foreach (var m in pre)
                 m.Invoke(data, new object[] { });
 
-            Type type = data.GetType();
-            if (binder == null)
-            {
-                binder = type;
-                type = Bind(ref data);
-            }
-            else {
-                Bind(ref data, binder);
-                Other.Swap(ref type, ref binder);
-            }
+            Type type = Bind(ref data, binder);
 
             StringBuilder sb = new StringBuilder();
 
             if (includeTypes)
             {
                 if (includeType)
-                    sb.Append(serializationTypes.AddType(binder != null ? binder.FullName : type.FullName));
+                    sb.Append(serializationTypes.AddType(type.FullName));
                 sb.Append(':');
             }
             if (type.IsSerializable)
@@ -130,7 +110,13 @@ namespace MyLib.Serialization
             foreach (var field in ps)
             {
                 object value = field.GetValue(data);
-                sb.Append(Serialize(value, field.fieldType != value.GetType(), Bind(field)));
+                Type type = Bind(field);
+                if (type == field.fieldType)
+                    sb.Append(Serialize(value, type != value.GetType(), type));
+                else {
+                    Bind(ref value, type);
+                    sb.Append(Serialize(value, false, null));
+                }
             }
         }
         void Split(StringBuilder sb)
@@ -151,7 +137,6 @@ namespace MyLib.Serialization
 
         public T Deserialize<T>(StreamReader reader, Type binder = null)
         {
-            int l = 0;
             includeTypes = ((char) reader.Peek()) == ':';
             if (includeTypes)
             {
@@ -246,39 +231,23 @@ namespace MyLib.Serialization
                 if(IsIEnumerable(t.node))
                     assemblies.AddRange(GetAssemblies(GetEnumerableElementType(t.node)));
             }
-            if (IsIEnumerable(type))
-            {
-                if (type.IsArray)
-                    UpdateBinders(type.GetElementType());
-                else
-                    UpdateBinders(type.GetGenericArguments().First());
-            }
+
             return assemblies.Distinct();
         }
-        Type GetEnumerableElementType(Type enumerable)
+        static Type GetEnumerableElementType(Type enumerable)
         {
             if (enumerable.IsArray)
                return enumerable.GetElementType();
             else
-                return enumerable.GetGenericArguments().First();
+                return enumerable.GetGenericArguments()[0];
         }
-        Type Bind(Type type)
-        {
-            Type binder = BindWithAttribute(type);
-            if (binder == null)
-            {
-                binder = binders.FindBySource(type);
-                if (binder == null)
-                    binder = type;
-            }
-            return binder;
-        }
-        Type BindWithAttribute(Type type)
+
+        static Type Bind(Type type)
         {
             var attr = type.GetCustomAttribute<SerializeBinderAttribute>();
-            return attr != null ? attr.binder : null;
+            return attr != null ? attr.binder : type;
         }
-        Type Bind(ref object obj)
+        static Type Bind(ref object obj)
         {
             Type type = obj.GetType();
             Type binder = Bind(type);
@@ -286,66 +255,35 @@ namespace MyLib.Serialization
                 obj = binder.GetConstructor(new Type[] { type }).Invoke(new object[] { obj });
             return binder;
         }
-        void Bind(ref object obj, Type binder)
+        static Type Bind(ref object obj, Type binder)
         {
-            obj = binder.GetConstructor(new Type[] { obj.GetType() }).Invoke(new object[] { obj });
+            if (binder != null)
+            {
+                obj = binder.GetConstructors().First(c => c.GetParameters().Length == 1).Invoke(new object[] { obj });
+                return binder;
+            }
+            else
+            {
+                return Bind(ref obj);
+            }
         }
-        Type Bind(UField field)
+        static Type Bind(UField field)
         {
             var attr = field.GetCustomAttribute<SerializeBinderAttribute>();
             return attr != null ? attr.binder : null;
         }
-        void UpdateBinders(Type type) // Remove this method later
-        {
-            // So much pain and abjection! For what?!
-            AddBinderFromSource(type);
-            type = Bind(type);
-
-            if (IsIEnumerable(type))
-            {
-                if (type.IsArray)
-                    UpdateBinders(type.GetElementType());
-                else
-                    UpdateBinders(type.GetGenericArguments().First());
-            }
-
-            foreach (var tf in GetFields(type).Select(f => new CustomTree<UField, Type>(f, s => Other.NonNull(Bind(s), Bind(s.fieldType)), t => GetFields(t).Where(a => a.GetCustomAttribute<NoSerializeBinder>() == null))).SelectMany(n => n.ByElements()).Select(n => n.node))
-            {
-                AddBinderFromSource(tf);
-                if(IsIEnumerable(tf))
-                {
-                    if (tf.IsArray)
-                        UpdateBinders(tf.GetElementType());
-                    else
-                        UpdateBinders(tf.GetGenericArguments().First());
-                }
-            }    
-        }
-        void AddBinderFromSource(Type source)
-        {
-            var attr = source.GetCustomAttribute<SerializeBinderAttribute>();
-            if (attr != null)
-                binders.Add(new TypePair(source, attr.binder));
-        }
-        static string SubString(string source, ref int left, int right)
-        {
-            int l = left;
-            left = right + 1;
-            return source.Substring(l, right - l);
-        }
 
         static object GetValue(Type type, string value)
         {
-            object result = null;
             if (type.Equals(typeof(string)))
-                result = value;
+                return value;
             else if (value != null)
             {
                 var parse = type.GetMethod("Parse", new Type[] { typeof(string) });
                 if (parse != null)
-                    result = parse.Invoke(null, new object[] { value });
+                    return parse.Invoke(null, new object[] { value });
             }
-            return result;
+            throw new Exception(type.ToString() + " has no Parse method");
         }
 
         static bool IsIEnumerable(Type type)
@@ -390,31 +328,28 @@ namespace MyLib.Serialization
         }
         bool IsSameTypes(object obj, Type binder)
         {
-            if (binder != null)
-                Bind(ref obj, binder);
-            else
-                Bind(ref obj);
-            var objs = TreeNode<object>.BuildCustomTree(obj, t => t, t =>
-            {
-                if (IsComVisible(t.GetType()))
-                    return new object[0];
-                binder = Bind(ref t);
-                return GetFields(binder).Select(f => f.GetValue(t));
-            })
-            .ByElements().Select(n => n.item);
+            Bind(ref obj, binder);
 
-            foreach (var o in objs)
+            if (IsIEnumerable(obj.GetType()))
+                if (!IsSameElements((IEnumerable)obj))
+                    return false;
+
+            Forest<CustomTree<FieldObject, FieldObject>> forest = new Forest<CustomTree<FieldObject, FieldObject>>(
+                GetFields(obj.GetType()).Select(field => new CustomTree<FieldObject, FieldObject>(new FieldObject(field, field.GetValue(obj)), f => f,
+                    f => GetFields(f.btype)
+                    .Where(c => c.fieldType != f.btype)
+                    .Select(t => new FieldObject(t, t.GetValue(f.bvalue))))
+                )
+            );
+
+            foreach(var f in forest.ByElements())
             {
-                object tempo = o;
-                Type t = Bind(ref tempo);
+                var fo = f.source;
+                Type t = fo.btype;
+                if (t != fo.bvalue.GetType())
+                    return false;
                 if (IsIEnumerable(t))
-                {
-                    if (!IsSameElements((IEnumerable)tempo))
-                        return false;
-                }
-                else
-                foreach (var f in GetFields(t))
-                    if (f.fieldType != f.GetValue(tempo).GetType())
+                    if (!IsSameElements((IEnumerable)fo.bvalue))
                         return false;
             }
             return true;
@@ -443,30 +378,43 @@ namespace MyLib.Serialization
             else
                 return GetConstructorArgs(type).Concat(GetAddons(type));
         }
-        bool TryExtract(ExtractResult expected, string source, int left)
-        {
-            string sub;
-            return Extract(source, ref left, out sub) == expected;
-        }
 
-        ExtractResult Extract(string source, ref int left, out string result)
+        public static List<Type> CollectDynamicTypes(object obj)
         {
-            for (int i = left; i < source.Length; i++)
+            List<Type> types = new List<Type>();
+
+            Forest<CustomTree<FieldObject, FieldObject>> forest = new Forest<CustomTree<FieldObject, FieldObject>>(
+                GetFields(obj.GetType()).Select(field => new CustomTree<FieldObject, FieldObject>(new FieldObject(field, field.GetValue(obj)), f => f,
+                    f => GetFields(f.btype)
+                    .Where(c => c.fieldType != f.btype)
+                    .Select(t => new FieldObject(t, t.GetValue(f.bvalue))))
+                )
+                );
+
+            foreach (var f in forest.ByElements())
             {
-                if (source[i] == splitter)
+                Type type = f.source.bvalue.GetType();
+                if (f.source.btype != type)
                 {
-                    result = SubString(source, ref left, i);
-                    return ExtractResult.Value;
+                    if (!types.Contains(type))
+                        types.Add(type);
                 }
-                else if (source[i] == ':')
+                if(IsIEnumerable(type))
                 {
-                    result = SubString(source, ref left, i);
-                    return ExtractResult.Type;
+                    var en = (IEnumerable)f.source.bvalue;
+                    var enType = GetEnumerableElementType(type);
+                    foreach(var e in en)
+                    {
+                        Type eType = e.GetType();
+                        if (eType != enType)
+                            if (!types.Contains(eType))
+                                types.Add(eType);
+                        types.AddRange(CollectDynamicTypes(e));
+                    }
                 }
             }
 
-            result = SubString(source, ref left, source.Length);
-            return ExtractResult.Value;
+            return types;
         }
 
         ExtractResult Extract(StreamReader sr, out string result)
@@ -507,6 +455,21 @@ namespace MyLib.Serialization
             Type,
             Value
         }
+
+        struct FieldObject
+        {
+            UField field;
+            object value;
+
+            public Type btype { get { var t = Bind(field); return t != null ? t : Bind(field.fieldType); } }
+            public object bvalue { get { var t = value; Bind(ref t, Bind(field)); return t; } }
+
+            public FieldObject(UField field, object value)
+            {
+                this.field = field;
+                this.value = value;
+            }
+        }
     }
     public enum CSOptions
     {
@@ -515,4 +478,5 @@ namespace MyLib.Serialization
         NoTypes = 2,
         SafeString = 4,
     }
+
 }

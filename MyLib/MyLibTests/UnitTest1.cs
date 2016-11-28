@@ -83,6 +83,17 @@ namespace MyLibTests
             string d = cs.Serialize(ss);
             Assert.AreEqual("111222", cs.Deserialize<SafeStrings>(d).ToString());
         }
+
+        [TestMethod]
+        public void TestTypesCollecting()
+        {
+            Dynamic d = new Dynamic();
+            var t = new MyLib.TreeNode<int>(1);
+            t.AddNode(3);
+            d.value = t;
+            var r = CompactSerializer.CollectDynamicTypes(d);
+            Assert.IsTrue(true);
+        }
     }
     public abstract class abs
     {
@@ -122,5 +133,11 @@ namespace MyLibTests
         {
             return s1 + s2;
         }
+    }
+
+    [Serializable]
+    class Dynamic
+    {
+        public object value;
     }
 }
