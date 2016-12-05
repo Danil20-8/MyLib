@@ -52,7 +52,7 @@ namespace MyLib.Serialization
         {
 
             var pre = data.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(m => m.GetCustomAttribute<PostDeserializeAttribute>() != null);
+                .Where(m => m.GetCustomAttribute<PreSerializeAttribute>() != null);
             foreach (var m in pre)
                 m.Invoke(data, new object[] { });
 
@@ -198,6 +198,8 @@ namespace MyLib.Serialization
                     foreach (var sa in GetSerializedFields(binder))
                         result.AddField(sa.Name, Deserialize(sa.fieldType, Bind(sa), reader), SerializeTemp.FieldFlags.Addon);
                 }
+
+                return result.GetValue();
             }
             else
             {
@@ -205,9 +207,16 @@ namespace MyLib.Serialization
                     result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), reader), SerializeTemp.FieldFlags.Arg);
                 foreach (var ad in GetAddons(binder))
                     result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), reader), SerializeTemp.FieldFlags.Addon);
+
+                var value = result.GetValue();
+                var postSerialize = binder.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                    .Where(m => m.GetCustomAttribute<PostDeserializeAttribute>() != null);
+                foreach (var m in postSerialize)
+                    m.Invoke(value, null);
+
+                    return value is IBinder ? ((IBinder)value).GetResult() : value;
             }
 
-            return binder == ftype ? result.GetValue() : ((IBinder)result.GetValue()).GetResult();
         }
         Type GetType(string name)
         {
