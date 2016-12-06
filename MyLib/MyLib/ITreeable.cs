@@ -30,7 +30,12 @@ namespace MyLib
             r.AddChild(node);
             node.SetRoot(r);
         }
-
+        public static void RemoveNode<Tnode>(this Tnode self, Tnode node, params int[] path) where Tnode : ITreeable<Tnode>
+        {
+            Tnode r = path.Length > 0 ? self.GetNode(path) : self;
+            r.RemoveChild(node);
+            node.SetRoot(default(Tnode));
+        }
         public static Tresult BuildTree<Tnode, Tresult>(this Tnode self, Func<Tnode, Tresult> selector) where Tnode : ITreeable<Tnode> where Tresult : ITreeable<Tresult>
         {
             Tresult root = selector(self);
