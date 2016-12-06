@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="Algoriphms\EnumerableExtends.cs" />
     <Compile Include="Algoriphms\Other.cs" />
+    <Compile Include="Algoriphms\WithMinMax.cs" />
     <Compile Include="CustomTree.cs" />
     <Compile Include="ITreeable.cs" />
     <Compile Include="Modern\MemberExtends.cs" />

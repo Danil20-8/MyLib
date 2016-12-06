@@ -52,6 +52,7 @@ namespace MyLibTests
             string d = cs.Serialize(new Dictionary<int, int>[] { new Dictionary<int, int>() { { 1, 1 } }, new Dictionary<int, int>() { { 1, 1 } } }, typeof(DictionaryArrayBinder<int, int>));
             Assert.AreEqual("2&1&1&1&1&1&1&", d);
         }
+
     }
 
     public class bar

@@ -290,4 +290,13 @@ namespace MyLib.Serialization
     {
 
     }
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    public class VersionAttribute : Attribute
+    {
+        public readonly int version;
+        public VersionAttribute(int version)
+        {
+            this.version = version;
+        }
+    }
 }

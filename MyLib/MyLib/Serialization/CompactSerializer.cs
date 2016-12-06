@@ -73,15 +73,15 @@ namespace MyLib.Serialization
                     var numerable = ((IEnumerable)data).Cast<object>();
                     bool withType = false;
                     if (includeTypes)
-                        if(!IsSameElements((IEnumerable)data))
+                        if (!IsSameElements((IEnumerable)data))
                             withType = true;
                     sb.Append(numerable.Count());
-                                        Split(sb);
+                    Split(sb);
                     if (numerable.Count() > 0)
                         sb.Append(numerable.Select(e => Serialize(e, withType, null)).ToString(""));
 
                 }
-                else if(type == typeof(string) && ((options & CSOptions.SafeString) != 0))
+                else if (type == typeof(string) && ((options & CSOptions.SafeString) != 0))
                 {
                     sb.Append(((string)data).Length);
                     Split(sb);
@@ -101,8 +101,18 @@ namespace MyLib.Serialization
                     Write(sb, data, GetSerializedFields(type));
                 }
             }
-            else
-                Write(sb, data, GetConstructorArgs(type).Concat(GetAddons(type)));
+            else {
+                Tuple<Type, VersionAttribute> tv;
+                if(type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).Select(t => new Tuple<Type, VersionAttribute>(t, t.GetCustomAttribute<VersionAttribute>()))
+                    .WithMax(t => t.Item2.version, t => t.Item2 != null, out tv))
+                {
+                    sb.Append(tv.Item2.version.ToString()); Split(sb);
+
+                    sb.Append(Serialize(data, false, tv.Item1));
+                }
+                else
+                    Write(sb, data, GetConstructorArgs(type).Concat(GetAddons(type)));
+            }
             return sb.ToString();
         }
         void Write(StringBuilder sb, object data, IEnumerable<UField> ps)
@@ -203,18 +213,32 @@ namespace MyLib.Serialization
             }
             else
             {
-                foreach (var ca in GetConstructorArgs(binder))
-                    result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), reader), SerializeTemp.FieldFlags.Arg);
-                foreach (var ad in GetAddons(binder))
-                    result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), reader), SerializeTemp.FieldFlags.Addon);
+                var vs = binder.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).Select(t => new Tuple<Type, VersionAttribute>(t, t.GetCustomAttribute<VersionAttribute>()))
+                    .Where(t => t.Item2 != null).ToArray();
+                if (vs.Length == 0)
+                {
 
-                var value = result.GetValue();
-                var postSerialize = binder.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-                    .Where(m => m.GetCustomAttribute<PostDeserializeAttribute>() != null);
-                foreach (var m in postSerialize)
-                    m.Invoke(value, null);
+                    foreach (var ca in GetConstructorArgs(binder))
+                        result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), reader), SerializeTemp.FieldFlags.Arg);
+                    foreach (var ad in GetAddons(binder))
+                        result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), reader), SerializeTemp.FieldFlags.Addon);
+
+                    var value = result.GetValue();
+                    var postSerialize = binder.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                        .Where(m => m.GetCustomAttribute<PostDeserializeAttribute>() != null);
+                    foreach (var m in postSerialize)
+                        m.Invoke(value, null);
 
                     return value is IBinder ? ((IBinder)value).GetResult() : value;
+                }
+                else
+                {
+                    string line;
+                    Extract(reader, out line);
+                    int v = int.Parse(line);
+                    var value = Deserialize(binder, vs.First(t => t.Item2.version == v).Item1, reader);
+                    return value is IBinder ? ((IBinder)value).GetResult() : value;
+                }
             }
 
         }
@@ -243,6 +267,8 @@ namespace MyLib.Serialization
 
             return assemblies.Distinct();
         }
+
+
         static Type GetEnumerableElementType(Type enumerable)
         {
             if (enumerable.IsArray)
@@ -294,7 +320,10 @@ namespace MyLib.Serialization
             }
             throw new Exception(type.ToString() + " has no Parse method");
         }
-
+        static Type GetVersionSerialize(Type type, int version)
+        {
+            return type.GetNestedTypes().First(t => t.GetCustomAttribute<VersionAttribute>().version == version);
+        }
         static bool IsIEnumerable(Type type)
         {
             return type.GetInterfaces().Has(typeof(IEnumerable)) && type != typeof(string);

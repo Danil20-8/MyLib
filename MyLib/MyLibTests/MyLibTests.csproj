@@ -55,6 +55,7 @@
     <Compile Include="TestAttributesSerialization.cs" />
     <Compile Include="TestNullBinder.cs" />
     <Compile Include="TestTrees.cs" />
+    <Compile Include="TestVersionSerializable.cs" />
     <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
