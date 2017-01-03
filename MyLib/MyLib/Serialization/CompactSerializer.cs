@@ -57,7 +57,7 @@ namespace MyLib.Serialization
                 m.Invoke(data, new object[] { });
 
             Type type = Bind(ref data, binder);
-
+            SerializedType stype = new SerializedType(type);
             StringBuilder sb = new StringBuilder();
 
             if (includeTypes)
@@ -66,11 +66,11 @@ namespace MyLib.Serialization
                     sb.Append(serializationTypes.AddType(type.FullName));
                 sb.Append(':');
             }
-            if (type.IsSerializable)
+            if (stype.IsSerializable)
             {
-                if (IsIEnumerable(type))
+                if (stype.IsIEnumerable || stype.IsArray)
                 {
-                    var numerable = ((IEnumerable)data).Cast<object>();
+                    var numerable = stype.GetElements(data);
                     bool withType = false;
                     if (includeTypes)
                         if (!IsSameElements((IEnumerable)data))
@@ -81,24 +81,21 @@ namespace MyLib.Serialization
                         sb.Append(numerable.Select(e => Serialize(e, withType, null)).ToString(""));
 
                 }
-                else if (type == typeof(string) && ((options & CSOptions.SafeString) != 0))
+                else if (stype.IsString && ((options & CSOptions.SafeString) != 0))
                 {
                     sb.Append(((string)data).Length);
                     Split(sb);
                     sb.Append(data.ToString());
                     Split(sb);
                 }
-                else if (IsComVisible(type))
+                else if (stype.IsComVisible)
                 {
                     sb.Append(data.ToString());
                     Split(sb);
                 }
                 else
                 {
-                    if (!typeof(ValueType).IsInstanceOfType(data))
-                        if (type.GetConstructor(new Type[] { }) == null)
-                            throw new Exception(string.Format("{0} has no default constructor", type));
-                    Write(sb, data, GetSerializedFields(type));
+                    Write(sb, data, stype.GetTypeFields());
                 }
             }
             else {
@@ -111,7 +108,7 @@ namespace MyLib.Serialization
                     sb.Append(Serialize(data, false, tv.Item1));
                 }
                 else
-                    Write(sb, data, GetConstructorArgs(type).Concat(GetAddons(type)));
+                    Write(sb, data, stype.GetTypeAll());
             }
             return sb.ToString();
         }
@@ -159,8 +156,6 @@ namespace MyLib.Serialization
         }
         object Deserialize(Type ftype, Type binder, StreamReader reader)
         {
-            SerializeTemp result = null;
-
             if (includeTypes)
             {
                 string sub;
@@ -171,11 +166,12 @@ namespace MyLib.Serialization
             if(binder == null)
                 binder = Bind(ftype);
 
-            result = new SerializeTemp(binder);
+            var stype = new SerializedType(binder);
+            SerializeTemp result = new SerializeTemp(stype);
 
-            if (binder.IsSerializable)
+            if (stype.IsSerializable)
             {
-                if (IsIEnumerable(binder) || binder.IsArray)
+                if (stype.IsIEnumerable || stype.IsArray)
                 {
                     Type elementType = null;
                     if (binder.IsArray)
@@ -187,29 +183,29 @@ namespace MyLib.Serialization
                     Extract(reader, out line);
                     int length = int.Parse(line);
                     for (int i = 0; i < length; i++)
-                        result.AddField("", Deserialize(elementType, null, reader), SerializeTemp.FieldFlags.Element);
+                        result.AddElement(Deserialize(elementType, null, reader));
                 }
-                else if(binder == typeof(string) && ((options & CSOptions.SafeString) != 0))
+                else if(stype.IsString && ((options & CSOptions.SafeString) != 0))
                 {
                     string line;
                     Extract(reader, out line);
                     int length = int.Parse(line);
                     Extract(reader, out line, length);
-                    result.AddField("", line, SerializeTemp.FieldFlags.Element);
+                    result.SetValue(line);
                 }
-                else if (IsComVisible(binder))
+                else if (stype.IsComVisible)
                 {
                     string line;
                     Extract(reader, out line);
-                    result.AddField("", GetValue(binder, line), SerializeTemp.FieldFlags.Element);
+                    result.SetValue(GetValue(binder, line));
                 }
                 else
                 {
-                    foreach (var sa in GetSerializedFields(binder))
-                        result.AddField(sa.Name, Deserialize(sa.fieldType, Bind(sa), reader), SerializeTemp.FieldFlags.Addon);
+                    foreach (var sa in stype.GetTypeFields())
+                        result.AddElement(Deserialize(sa.fieldType, Bind(sa), reader));
                 }
 
-                return result.GetValue();
+                return result.GetResult();
             }
             else
             {
@@ -218,12 +214,12 @@ namespace MyLib.Serialization
                 if (vs.Length == 0)
                 {
 
-                    foreach (var ca in GetConstructorArgs(binder))
-                        result.AddField(ca.Name, Deserialize(ca.fieldType, Bind(ca), reader), SerializeTemp.FieldFlags.Arg);
-                    foreach (var ad in GetAddons(binder))
-                        result.AddField(ad.Name, Deserialize(ad.fieldType, Bind(ad), reader), SerializeTemp.FieldFlags.Addon);
+                    foreach (var ca in stype.GetTypeConstructorArgs())
+                        result.AddArg(Deserialize(ca.fieldType, Bind(ca), reader));
+                    foreach (var ad in stype.GetTypeFields())
+                        result.AddElement(Deserialize(ad.fieldType, Bind(ad), reader));
 
-                    var value = result.GetValue();
+                    var value = result.GetResult();
                     var postSerialize = binder.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                         .Where(m => m.GetCustomAttribute<PostDeserializeAttribute>() != null);
                     foreach (var m in postSerialize)
@@ -348,7 +344,7 @@ namespace MyLib.Serialization
         }
         static IEnumerable<UField> GetSerializedFields(Type type)
         {
-            return UField.GetUFields(type, BindingFlags.Instance | BindingFlags.Public)
+            return UField.GetUFields(type, BindingFlags.Instance | BindingFlags.Public, true)
                 .Where(f => f.GetCustomAttribute<NonSerializedAttribute>() == null);
         }
         bool IsSameElements(IEnumerable numerable)

@@ -4,83 +4,216 @@ using System.Collections;
 using System.Linq;
 using System.Text;
 using System.Reflection;
-
+using System.Runtime.InteropServices;
 using MyLib.Algoriphms;
 using MyLib.Modern;
 
 namespace MyLib.Serialization
 {
-    class SerializeTemp
+    struct SerializedType
     {
-        List<object> dfields = new List<object>();
-        Dictionary<string, object> addons = new Dictionary<string, object>();
-        List<object> elements = new List<object>();
-        Type type;
-        public SerializeTemp(Type type)
+        public bool IsSerializable { get { return kind != Kind.MySerializable; } }
+        public bool IsMySerializable { get { return kind == Kind.MySerializable; } }
+        public bool IsString { get { return kind == Kind.String; } }
+        public bool IsComVisible { get { return kind == Kind.ComVisible || kind == Kind.String; } }
+        public bool IsArray { get { return kind == Kind.Array; } }
+        public bool IsIEnumerable { get { return kind == Kind.IEnumerable; } }
+
+
+        public readonly Type type;
+        Kind kind;
+
+        UField[] addons;
+        UField[] args;
+        public SerializedType(Type type)
         {
             this.type = type;
-        }
-        public void AddField(string name, object field, FieldFlags flags)
-        {
-            switch (flags)
-            {
-                case FieldFlags.Element:
-                    elements.Add(field);
-                    break;
-                case FieldFlags.Arg:
-                    dfields.Add(field);
-                    break;
-                case FieldFlags.Addon:
-                    addons.Add(name, field);
-                    break;
-            }
-        }
-        public object GetValue()
-        {
-            object result = null;
-            var ctor = type.GetConstructor(dfields.Select(f => f.GetType()).ToArray());
-            if (ctor != null)
-                result = ctor.Invoke(dfields.ToArray());
-            else if (type != typeof(string) && !type.IsArray)
-                result = Activator.CreateInstance(type);
-            foreach (var a in addons)
-            {
-                var f = UField.GetField(type, a.Key, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                f.SetValue(result, a.Value);
-            }
 
-            if (type.IsArray)
+            addons = null;
+            args = null;
+
+            if (type.IsSerializable)
             {
-                Array arr = Array.CreateInstance(type.GetElementType(), elements.Count);
-                for (int i = 0; i < elements.Count; i++)
-                    arr.SetValue(elements[i], i);
-                result = arr;
-            }
-            else if (type.GetInterfaces().Has(typeof(IEnumerable)) && type.GetInterfaces().Has(typeof(ICollection)))
-            {
-                MethodInfo add = null;
-                if (type.IsGenericType)
-                    add = type.GetMethod("Add", type.GetGenericArguments());
+                if(type == typeof(string))
+                {
+                    kind = Kind.String;
+                }
+                else if (type.IsArray)
+                {
+                    kind = Kind.Array;
+                }
+                else if(type.GetInterface("IEnumerable") != null && type.GetInterface("ICollection") != null && type.IsGenericType)
+                {
+                    kind = Kind.IEnumerable;
+                }
+                else if (type.GetCustomAttribute<ComVisibleAttribute>() != null)
+                {
+                    kind = Kind.ComVisible;
+                }
                 else
-                    add = type.GetMethod("Add", new Type[] { typeof(object) });
-                if (add != null)
-                    foreach (var e in elements)
-                        add.Invoke(result, new object[] { e });
+                {
+                    kind = Kind.Serializable;
+                    addons = UField.GetUFields(type, BindingFlags.Instance | BindingFlags.Public, true).Where(p => p.GetCustomAttribute<NonSerializedAttribute>() == null).ToArray();
+                }
             }
-            else if (elements.Count == 1)
+            else
             {
-                result = elements[0];
+                kind = Kind.MySerializable;
+
+                var fields = UField.GetUFields(type, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                addons = fields.Where(p => p.GetCustomAttribute<AddonAttribute>() != null).ToArray();
+                args = fields.Select(p => new Tuple<UField, ConstructorArgAttribute>(p, p.GetCustomAttribute<ConstructorArgAttribute>())).Where(t => t.Item2 != null).OrderBy(t => t.Item2.position).Select(t => t.Item1).ToArray();
             }
-            return result;
         }
 
-        public enum FieldFlags
+        public object GetValue(object obj)
         {
-            Element,
-            Arg,
-            Addon
+            return obj;
+        }
+        public IEnumerable<object> GetElements(object obj)
+        {
+            return ((IEnumerable)obj).Cast<object>();
+        }
+        public IEnumerable<object> GetFields(object obj)
+        {
+            if (IsSerializable)
+                return addons.Select(p => p.GetValue(obj));
+            else
+                return args.Select(p => p.GetValue(obj)).Concat(addons.Select(p => p.GetValue(obj)));
+        }
+        public IEnumerable<UField> GetTypeFields()
+        {
+            return addons;
+        }
+        public IEnumerable<UField> GetTypeConstructorArgs()
+        {
+            return args;
+        }
+        public IEnumerable<UField> GetTypeAll()
+        {
+            return args.Concat(addons);
+        }
+
+        public object CreateInstance(object[] args, object[] fields)
+        {
+            object obj = CreateInstance(args);
+            SetFields(obj, fields);
+            return obj;
+        }
+
+        public object CreateInstance(object[] args)
+        {
+            if (this.args == null)
+                return Activator.CreateInstance(type);
+            else
+            {
+                if (this.args.Length == 0)
+                    return Activator.CreateInstance(type);
+                else 
+                    return type.GetConstructor(this.args.Select(a => a.fieldType).ToArray()).Invoke(args);
+                
+            }
+        }
+
+        public void SetFields(object obj, object[] fields)
+        {
+            for(int i = 0; i < addons.Length; i++)
+                addons[i].SetValue(obj, fields[i]);
+        }
+
+        enum Kind
+        {
+            ComVisible,
+            IEnumerable,
+            Array,
+            String,
+            Serializable,
+            MySerializable
         }
     }
+
+    struct SerializeTemp
+    {
+        SerializedType type;
+
+        object value;
+        List<object> elements;
+        List<object> args;
+        public SerializeTemp(SerializedType type)
+        {
+            this.type = type;
+
+            value = null;
+            elements = null;
+            args = null;
+
+            if(!type.IsComVisible)
+            {
+                elements = new List<object>();
+                if (type.IsMySerializable)
+                    args = new List<object>();
+            }
+        }
+
+        public void SetValue(object value)
+        {
+            this.value = value;
+        }
+
+        public void AddElement(object element)
+        {
+            elements.Add(element);
+        }
+        public void AddArg(object arg)
+        {
+            args.Add(arg);
+        }
+
+        public object GetResult()
+        {
+            if(type.IsSerializable)
+            {
+                if (type.IsString)
+                {
+                    return value;
+                }
+                else if (type.IsArray)
+                {
+                    var arr = Array.CreateInstance(type.type.GetElementType(), elements.Count);
+                    for (int i = 0; i < arr.Length; i++)
+                        arr.SetValue(elements[i], i);
+                    return arr;
+                }
+                else if (type.IsIEnumerable)
+                {
+                    var result = type.CreateInstance(null);
+                    MethodInfo add = type.type.GetMethod("Add", type.type.GetGenericArguments());
+
+                    object[] arg = new object[1];
+                    foreach (var e in elements)
+                    {
+                        arg[0] = e;
+                        add.Invoke(result, arg);
+                    }
+                    return result;
+                }
+                else if(type.IsComVisible)
+                {
+                    return value;
+                }
+                else
+                {
+                    return type.CreateInstance(null, elements.ToArray());
+                }
+            }
+            else
+            {
+                return type.CreateInstance(args.ToArray(), elements.ToArray());
+            }
+        }
+    }
+
     public class UField
     {
         MemberInfo field;
@@ -118,9 +251,13 @@ namespace MyLib.Serialization
             else
                 ((FieldInfo)field).SetValue(master, value);
         }
-        public static UField[] GetUFields(Type self, BindingFlags flags)
+        public static UField[] GetUFields(Type self, BindingFlags flags, bool readWriteOnly = false)
         {
-            var ps = self.GetProperties(flags).Select(p => new UField(p));
+            IEnumerable<UField> ps;
+            if (readWriteOnly)
+                ps = self.GetProperties(flags).Where(p => p.CanRead && p.CanWrite).Select(p => new UField(p));
+            else
+                ps = self.GetProperties(flags).Select(p => new UField(p));
             var fs = self.GetFields(flags).Select(f => new UField(f));
             return ps.Concat(fs).ToArray();
         }
