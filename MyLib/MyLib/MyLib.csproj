@@ -52,6 +52,7 @@
     <Compile Include="Serialization\Binders\DictionaryBinder.cs" />
     <Compile Include="Serialization\Binders\NullBinder.cs" />
     <Compile Include="Serialization\CompactSerializer.cs" />
+    <Compile Include="Serialization\FieldObjectTree.cs" />
     <Compile Include="Serialization\General.cs" />
     <Compile Include="Serialization\SerializationInfo.cs" />
     <Compile Include="TreeNode.cs" />

@@ -10,7 +10,7 @@ using MyLib.Algoriphms;
 
 namespace MyLib.Serialization
 {
-    public class CompactSerializer
+    public partial class CompactSerializer
     {
         SerializationTypes serializationTypes;
         bool includeTypes;
@@ -37,7 +37,7 @@ namespace MyLib.Serialization
                 includeTypes = true;
             else if((options & CSOptions.NoTypes) == 0)
             {
-                includeTypes = !IsSameTypes(data, binder);
+                includeTypes = HasDerivedFields(data, binder);
             }
             var result = Serialize(data, false, binder);
             if (includeTypes)
@@ -73,7 +73,7 @@ namespace MyLib.Serialization
                     var numerable = stype.GetElements(data);
                     bool withType = false;
                     if (includeTypes)
-                        if (!IsSameElements((IEnumerable)data))
+                        if (!HasDerivedElements((IEnumerable)data))
                             withType = true;
                     sb.Append(numerable.Count());
                     Split(sb);
@@ -117,13 +117,8 @@ namespace MyLib.Serialization
             foreach (var field in ps)
             {
                 object value = field.GetValue(data);
-                Type type = Bind(field);
-                if (type == field.fieldType)
-                    sb.Append(Serialize(value, type != value.GetType(), type));
-                else {
-                    Bind(ref value, type);
-                    sb.Append(Serialize(value, false, null));
-                }
+                Type type = Bind(field, ref value);
+                sb.Append(Serialize(value, type != value.GetType(), null));
             }
         }
         void Split(StringBuilder sb)
@@ -213,11 +208,10 @@ namespace MyLib.Serialization
                     .Where(t => t.Item2 != null).ToArray();
                 if (vs.Length == 0)
                 {
-
                     foreach (var ca in stype.GetTypeConstructorArgs())
-                        result.AddArg(Deserialize(ca.fieldType, Bind(ca), reader));
+                        result.AddArg(Deserialize(Bind(ca), null, reader));
                     foreach (var ad in stype.GetTypeFields())
-                        result.AddElement(Deserialize(ad.fieldType, Bind(ad), reader));
+                        result.AddElement(Deserialize(Bind(ad), null, reader));
 
                     var value = result.GetResult();
                     var postSerialize = binder.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
@@ -272,7 +266,21 @@ namespace MyLib.Serialization
             else
                 return enumerable.GetGenericArguments()[0];
         }
-
+        static Type Bind(UField field, ref object obj)
+        {
+            Type binder = Bind(field);
+            if (binder != field.fieldType)
+            {
+                return Bind(ref obj, binder);
+            }
+            else
+                return binder;
+        }
+        static Type Bind(UField field)
+        {
+            var attr = field.GetCustomAttribute<SerializeBinderAttribute>();
+            return attr != null ? attr.binder : Bind(field.fieldType);
+        }
         static Type Bind(Type type)
         {
             var attr = type.GetCustomAttribute<SerializeBinderAttribute>();
@@ -297,11 +305,6 @@ namespace MyLib.Serialization
             {
                 return Bind(ref obj);
             }
-        }
-        static Type Bind(UField field)
-        {
-            var attr = field.GetCustomAttribute<SerializeBinderAttribute>();
-            return attr != null ? attr.binder : null;
         }
 
         static object GetValue(Type type, string value)
@@ -347,7 +350,7 @@ namespace MyLib.Serialization
             return UField.GetUFields(type, BindingFlags.Instance | BindingFlags.Public, true)
                 .Where(f => f.GetCustomAttribute<NonSerializedAttribute>() == null);
         }
-        bool IsSameElements(IEnumerable numerable)
+        bool HasDerivedElements(IEnumerable numerable, bool deep = false)
         {
             Type t = numerable.GetType();
             Type elementType = null;
@@ -356,37 +359,28 @@ namespace MyLib.Serialization
             else
                 elementType = t.GetGenericArguments().First();
             foreach (var e in numerable)
-                if (e.GetType() != elementType || !IsSameTypes(e, null))
+                if (e.GetType() != elementType || (deep && HasDerivedFields(e, null)))
                     return false;
             return true;
         }
-        bool IsSameTypes(object obj, Type binder)
+        bool HasDerivedFields(object obj, Type binder)
         {
             Bind(ref obj, binder);
 
             if (IsIEnumerable(obj.GetType()))
-                if (!IsSameElements((IEnumerable)obj))
-                    return false;
-
-            Forest<CustomTree<FieldObject, FieldObject>> forest = new Forest<CustomTree<FieldObject, FieldObject>>(
-                GetFields(obj.GetType()).Select(field => new CustomTree<FieldObject, FieldObject>(new FieldObject(field, field.GetValue(obj)), f => f,
-                    f => GetFields(f.btype)
-                    .Where(c => c.fieldType != f.btype)
-                    .Select(t => new FieldObject(t, t.GetValue(f.bvalue))))
-                )
-            );
+                if (!HasDerivedElements((IEnumerable)obj, true))
+                    return true;
+            Forest<FieldObjectTree> forest = new Forest<FieldObjectTree>(FieldObjectTree.CreateTrees(obj));
 
             foreach(var f in forest.ByElements())
             {
-                var fo = f.source;
-                Type t = fo.btype;
-                if (t != fo.bvalue.GetType())
-                    return false;
-                if (IsIEnumerable(t))
-                    if (!IsSameElements((IEnumerable)fo.bvalue))
-                        return false;
+                if (!f.fieldObject.IsSameType())
+                    return true;
+                if (IsIEnumerable(f.fieldObject.btype))
+                    if (!HasDerivedElements((IEnumerable)f.fieldObject.bvalue, true))
+                        return true;
             }
-            return true;
+            return false;
         }
         IEnumerable<object> GetTreeObjects(object obj)
         {
@@ -492,16 +486,18 @@ namespace MyLib.Serialization
 
         struct FieldObject
         {
-            UField field;
-            object value;
-
-            public Type btype { get { var t = Bind(field); return t != null ? t : Bind(field.fieldType); } }
-            public object bvalue { get { var t = value; Bind(ref t, Bind(field)); return t; } }
+            public readonly Type btype;
+            public readonly object bvalue;
 
             public FieldObject(UField field, object value)
             {
-                this.field = field;
-                this.value = value;
+                bvalue = value;
+                btype = Bind(field, ref bvalue);
+            }
+
+            public bool IsSameType()
+            {
+                return btype == bvalue.GetType();
             }
         }
     }

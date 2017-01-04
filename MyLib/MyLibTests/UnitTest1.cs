@@ -52,6 +52,14 @@ namespace MyLibTests
             Assert.AreEqual(48, ((sba) cs.Deserialize<abs[]>(d)[2]).a);
         }
         [TestMethod]
+        public void TestAbstractInShell()
+        {
+            ShellAbstract[] a = new ShellAbstract[] { new ShellAbstract() };
+            CompactSerializer cs = new CompactSerializer();
+            string r = cs.Serialize(a);
+            Assert.AreEqual(1, cs.Deserialize<ShellAbstract[]>(r)[0].field.a);
+        }
+        [TestMethod]
         public void TestEmptyClass()
         {
             empty[] a = new empty[] { new empty(), new empty(), new empty() };
@@ -112,6 +120,11 @@ namespace MyLibTests
         {
 
         }
+    }
+    public class ShellAbstract
+    {
+        [Addon]
+        public abs field = new sba(1);
     }
     [Serializable]
     public class sable
