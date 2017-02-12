@@ -9,26 +9,24 @@ namespace MyLib.Parsing
     {
         Action<string> enterHandle;
         Action<string> exitHandle;
-        char[] trimChars;
 
 
-        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, Transition[] transits, bool ignoreEnd = false)
-            : base(transits, ignoreEnd)
+        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, Transition[] transits, ParseNodeFlags flags = ParseNodeFlags.None)
+            : base(transits, trimChars, flags)
         {
             this.enterHandle = enterHandle;
             this.exitHandle = exitHandle;
-            this.trimChars = trimChars;
         }
 
         protected override void EnterHandle(List<char> values)
         {
             if(enterHandle != null)
-                enterHandle(new string(values.ToArray()).Trim(trimChars));
+                enterHandle(new string(values.ToArray()));
         }
         protected override void ExitHandle(List<char> values)
         {
             if(exitHandle != null)
-                exitHandle(new string(values.ToArray()).Trim(trimChars));
+                exitHandle(new string(values.ToArray()));
         }
     }
 }

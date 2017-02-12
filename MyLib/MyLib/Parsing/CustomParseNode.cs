@@ -10,8 +10,8 @@ namespace MyLib.Parsing
         Action<List<Tsource>> enterHandle;
         Action<List<Tsource>> exitHandle;
 
-        public CustomParseNode(Action<List<Tsource>> enterHandle, Action<List<Tsource>> exitHandle, Transition[] transits, bool ignoreEnd = false)
-            : base(transits, ignoreEnd)
+        public CustomParseNode(Action<List<Tsource>> enterHandle, Action<List<Tsource>> exitHandle, Transition[] transits, ParseNodeFlags flags = ParseNodeFlags.None)
+            : base(transits, flags)
         {
             this.enterHandle = enterHandle;
             this.exitHandle = exitHandle;

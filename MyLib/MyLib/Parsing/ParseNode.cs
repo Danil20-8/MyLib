@@ -9,20 +9,27 @@ namespace MyLib.Parsing
     {
         // saving nodes in multithreading usage. you cannot change it
         ArraySafe<Transition> nodes;
-        readonly bool ignoreEnd;
+        readonly ParseNodeFlags flags;
+        Tsource[] trimKeys;
+
+        bool ignoreEnd { get { return (flags & ParseNodeFlags.IgnoreEnd) != 0; } }
+        bool clearOnBack { get { return (flags & ParseNodeFlags.DontClearOnBack) != ParseNodeFlags.DontClearOnBack; } }
 
         protected abstract void EnterHandle(List<Tsource> values);
         protected abstract void ExitHandle(List<Tsource> values);
 
-        public ParseNode(bool ignoreEnd = false)
-        {
-            this.ignoreEnd = ignoreEnd;
-        }
-
-        public ParseNode(Transition[] transits, bool ignoreEnd = false)
+        public ParseNode(Transition[] transits, ParseNodeFlags flags)
         {
             this.nodes = transits;
-            this.ignoreEnd = ignoreEnd;
+            this.trimKeys = new Tsource[0];
+            this.flags = flags;
+        }
+
+        public ParseNode(Transition[] transits, Tsource[] trimKeys, ParseNodeFlags flags = ParseNodeFlags.None)
+        {
+            this.nodes = transits;
+            this.trimKeys = trimKeys;
+            this.flags = flags;
         }
 
         public void SetTransitions(Transition[] transitions)
@@ -30,12 +37,13 @@ namespace MyLib.Parsing
             this.nodes = transitions;
         }
 
-        public void Parse(IEnumerator<Tsource> source)
+        public void Parse(IEnumerable<Tsource> source)
         {
-            Parse(source, new List<Tsource>());
+            var e = source.GetEnumerator();  // if enumerator is struct?
+            Parse(ref e, new List<Tsource>());
         }
 
-        void Parse(IEnumerator<Tsource> source, List<Tsource> values)
+        void Parse(ref IEnumerator<Tsource> source, List<Tsource> values)
         {
             EnterHandle(values);
             values.Clear();
@@ -46,23 +54,31 @@ namespace MyLib.Parsing
             while (source.MoveNext())
             {
                 temp_s = source.Current;
-                values.Add(temp_s);
 
+                foreach (var key in trimKeys)
+                    if (key.Equals(temp_s))
+                        goto SKIP_ELEMENT;
+                values.Add(temp_s);
+                SKIP_ELEMENT:
                 Transition transition;
 
-                if(CheckKeys(ts, temp_s, out transition))
+                if (CheckKeys(ts, temp_s, out transition))
                 {
-                    values.RemoveRange(values.Count - transition.key.Length, transition.key.Length); // No keys
+                    int keyLength = transition.GetKeyLength(trimKeys);
+                    values.RemoveRange(values.Count - keyLength, keyLength); // No keys
 
                     if (transition.handler != null)
                         transition.handler();
                     if (transition.node != null)
-                        transition.node.Parse(source, values);
+                        transition.node.Parse(ref source, values);
                     if (transition.isExit)
                     {
                         ExitHandle(values);
                         return;
                     }
+
+                    if(clearOnBack)
+                        values.Clear();
                 }
             }
 
@@ -104,6 +120,19 @@ namespace MyLib.Parsing
                 hits = 0;
             }
 
+            public int GetKeyLength(Tsource[] trimKeys)
+            {
+                if (trimKeys.Length == 0) return key.Length;
+                int length = 0;
+                foreach (var e in key) {
+                    foreach (var tk in trimKeys)
+                        if (e.Equals(tk)) goto TRIM;
+                    ++length;
+                    TRIM:
+                    continue;
+                }
+                return length;
+            }
             private int hits;
             public bool Try(Tsource value) { if (key[hits].Equals(value)) return ++hits == key.Length ? true : false; else { hits = 0; return false; } }
             public void ZeroHits() { hits = 0; }
@@ -124,8 +153,8 @@ namespace MyLib.Parsing
     public enum ParseNodeFlags
     {
         None = 0,
-        OneHit = 1,
-        ToEnd = 2,
+        IgnoreEnd = 1,
+        DontClearOnBack = 2,
 
     }
 

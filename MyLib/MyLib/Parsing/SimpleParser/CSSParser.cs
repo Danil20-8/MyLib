@@ -33,7 +33,7 @@ namespace MyLib.Parsing.SimpleParser
                 {
                     new ParseNode<char>.Transition() { key = valueKey, isExit = true },
                     new ParseNode<char>.Transition() { key = beginStringKey, node = stringValue }
-                });
+                }, ParseNodeFlags.DontClearOnBack);
 
             var optionNode = new StringParseNode(AddClass, null, trimChars,
                 new ParseNode<char>.Transition[]
@@ -47,13 +47,13 @@ namespace MyLib.Parsing.SimpleParser
                 {
                     new ParseNode<char>.Transition() { key = preNameKey, handler = MarkAsExist },
                     new ParseNode<char>.Transition() { key = optionsEnterKey, node = optionNode }
-                }, true);
+                }, ParseNodeFlags.IgnoreEnd);
         }
 
         public void Parse(IEnumerable<char> source)
         {
             cssResult = new Dictionary<string, Dictionary<string, string>>();
-            root.Parse(source.GetEnumerator());
+            root.Parse(source);
         }
         bool exist = false;
         void MarkAsExist()
