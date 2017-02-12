@@ -7,27 +7,28 @@ namespace MyLib.Parsing
 {
     public class StringParseNode : ParseNode<char>
     {
-        Action<string, char[]> handle;
+        Action<string> enterHandle;
+        Action<string> exitHandle;
         char[] trimChars;
 
-        public StringParseNode(Action<string, char[]> handle, char[] trimChars, char[] exitKey)
-            : this(handle, trimChars, exitKey, new char[0][], new ParseNode<char>[0], ParseNodeFlags.None)
+
+        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, Transition[] transits, bool ignoreEnd = false)
+            : base(transits, ignoreEnd)
         {
-        }
-        public StringParseNode(Action<string, char[]> handle, char[] trimChars, char[] exitKey, char[][] keys, ParseNode<char>[] nodes)
-            : this(handle, trimChars, exitKey, keys, nodes, ParseNodeFlags.None)
-        {
-        }
-        public StringParseNode(Action<string, char[]> handle, char[] trimChars, char[] exitKey, char[][] keys, ParseNode<char>[] nodes, ParseNodeFlags flags)
-            : base(exitKey, keys, nodes, flags)
-        {
-            this.handle = handle;
+            this.enterHandle = enterHandle;
+            this.exitHandle = exitHandle;
             this.trimChars = trimChars;
         }
 
-        protected override void Handle(List<char> values, char[] key)
+        protected override void EnterHandle(List<char> values)
         {
-            handle(new string(values.ToArray()).Trim(trimChars), key);
+            if(enterHandle != null)
+                enterHandle(new string(values.ToArray()).Trim(trimChars));
+        }
+        protected override void ExitHandle(List<char> values)
+        {
+            if(exitHandle != null)
+                exitHandle(new string(values.ToArray()).Trim(trimChars));
         }
     }
 }

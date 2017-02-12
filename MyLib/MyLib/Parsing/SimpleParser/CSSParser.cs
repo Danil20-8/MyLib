@@ -17,31 +17,37 @@ namespace MyLib.Parsing.SimpleParser
         readonly char[] optionsEnterKey = new char[] { '{' };
         readonly char[] optionsExitKey = new char[] { '}' };
         readonly char[] waitingValueKey = new char[] { '=' };
-        readonly char[] endValueKey = new char[] { ';' };
         readonly char[] beginStringKey = new char[] { '"' };
         readonly char[] endStringKey = new char[] { '"' };
-
-        readonly char[][] rootKeys = new char[][] { new char[] { '.' }, new char[] { '{' } };
         readonly char[] valueKey = new char[] { ';' };
-        readonly char[][] optionKeys = new char[][] { new char[] { '=' } };
-        readonly char[] optionExitKey = new char[] { '}' };
-        readonly char[][] classKeys = new char[][] { new char[] { '{' } };
+
         public CSSParser()
         {
-            var stringValueNode = new StringParseNode(AddOptionValue, trimChars,
-                endStringKey);
-            var valueNode = new StringParseNode(AddOptionValue, trimChars,
-                valueKey,
-                new char[][] { beginStringKey },
-                new ParseNode<char>[] { stringValueNode });
-            var optionNode = new StringParseNode(AddOption, trimChars, optionExitKey, optionKeys, new ParseNode<char>[] { valueNode });
-            var classNode = new StringParseNode(AddClass, trimChars, null, classKeys, new ParseNode<char>[] { optionNode }, ParseNodeFlags.OneHit);
+            var stringValue = new StringParseNode(null, null, trimChars,
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition() { key = endStringKey, isExit = true }
+                });
+            var valueNode = new StringParseNode(AddOption, AddValue, trimChars,
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition() { key = valueKey, isExit = true },
+                    new ParseNode<char>.Transition() { key = beginStringKey, node = stringValue }
+                });
 
-            root = new StringParseNode(AddClass, trimChars,
-                null,
-                new char[][] { preNameKey, optionsEnterKey },
-                new ParseNode<char>[] { classNode, optionNode },
-                ParseNodeFlags.ToEnd);
+            var optionNode = new StringParseNode(AddClass, null, trimChars,
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition() { key = waitingValueKey, node = valueNode },
+                    new ParseNode<char>.Transition() { key = optionsExitKey, isExit = true }
+                });
+
+            root = new StringParseNode(null, null, trimChars,
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition() { key = preNameKey, handler = MarkAsExist },
+                    new ParseNode<char>.Transition() { key = optionsEnterKey, node = optionNode }
+                }, true);
         }
 
         public void Parse(IEnumerable<char> source)
@@ -49,39 +55,36 @@ namespace MyLib.Parsing.SimpleParser
             cssResult = new Dictionary<string, Dictionary<string, string>>();
             root.Parse(source.GetEnumerator());
         }
+        bool exist = false;
+        void MarkAsExist()
+        {
+            exist = true;
+        }
 
-        void Nope(string value, char[] key) { }
-        void AddClass(string value, char[] key)
+        Dictionary<string, string> currClass;
+        void AddClass(string value)
         {
-            if(key == optionsEnterKey)
-                cssResult.Add(value, new Dictionary<string, string>());
-        }
-        void AddOption(string value, char[] key)
-        {
-            AddOption(value);
-        }
-        bool skipOne = false;
-        void AddOptionValue(string value, char[] key)
-        {
-            if (key == beginStringKey)
-                return;
-            if (skipOne)
+            if (exist)
             {
-                skipOne = false;
-                return;
+                currClass = cssResult[value];
+                exist = false;
             }
-            if (key == endStringKey)
-                skipOne = true;
-            AddValue(value);
+            else
+            {
+                currClass = new Dictionary<string, string>();
+                cssResult.Add(value, currClass);
+            }
         }
+
         string optionName;
         void AddOption(string name)
         {
             optionName = name;
         }
+
         void AddValue(string value)
         {
-            cssResult.Last().Value.Add(optionName, value);
+            currClass.Add(optionName, value);
         }
     }
 }

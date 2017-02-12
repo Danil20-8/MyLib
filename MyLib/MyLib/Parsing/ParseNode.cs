@@ -7,96 +7,117 @@ namespace MyLib.Parsing
 {
     public abstract class ParseNode<Tsource>
     {
-        Tsource[] exitKey;
-        int exitHits;
-        Tsource[][] keys;
-        ParseNode<Tsource>[] nodes;
-        int[] hits;
+        // saving nodes in multithreading usage. you cannot change it
+        ArraySafe<Transition> nodes;
+        readonly bool ignoreEnd;
 
-        ParseNodeFlags flags;
-        bool oneHit { get { return (flags & ParseNodeFlags.OneHit) != 0; } }
-        bool toEnd { get { return (flags & ParseNodeFlags.ToEnd) != 0; } }
+        protected abstract void EnterHandle(List<Tsource> values);
+        protected abstract void ExitHandle(List<Tsource> values);
 
-        List<Tsource> values = new List<Tsource>();
-
-        protected bool IsExitKey(Tsource[] key)
+        public ParseNode(bool ignoreEnd = false)
         {
-            return key.Equals(exitKey);
+            this.ignoreEnd = ignoreEnd;
         }
 
-        protected abstract void Handle(List<Tsource> values, Tsource[] key);
-
-        public ParseNode(Tsource[] exitKey) : this(exitKey, new Tsource[0][], new ParseNode<Tsource>[0])
+        public ParseNode(Transition[] transits, bool ignoreEnd = false)
         {
+            this.nodes = transits;
+            this.ignoreEnd = ignoreEnd;
         }
-        public ParseNode(Tsource[] exitKey, Tsource[][] keys, ParseNode<Tsource>[] nodes) : this(exitKey, keys, nodes, ParseNodeFlags.None)
-        {
-        }
-        public ParseNode(Tsource[] exitKey, Tsource[][] keys, ParseNode<Tsource>[] nodes, ParseNodeFlags flags)
-        {
-            this.exitKey = exitKey;
 
-            this.keys = keys;
-            this.hits = new int[keys.Length];
-            this.nodes = nodes;
-
-            this.flags = flags;
+        public void SetTransitions(Transition[] transitions)
+        {
+            this.nodes = transitions;
         }
 
         public void Parse(IEnumerator<Tsource> source)
         {
+            Parse(source, new List<Tsource>());
+        }
+
+        void Parse(IEnumerator<Tsource> source, List<Tsource> values)
+        {
+            EnterHandle(values);
             values.Clear();
+
+            Transition[] ts = nodes;
+
             Tsource temp_s;
             while (source.MoveNext())
             {
                 temp_s = source.Current;
                 values.Add(temp_s);
-                for (int i = 0; i < keys.Length; ++i)
+
+                Transition transition;
+
+                if(CheckKeys(ts, temp_s, out transition))
                 {
-                    if (keys[i][hits[i]].Equals(temp_s))
+                    values.RemoveRange(values.Count - transition.key.Length, transition.key.Length); // No keys
+
+                    if (transition.handler != null)
+                        transition.handler();
+                    if (transition.node != null)
+                        transition.node.Parse(source, values);
+                    if (transition.isExit)
                     {
-                        if (++hits[i] == keys[i].Length)
-                        {
-                            Handle(keys[i]);
-                            nodes[i].Parse(source);
-                            if (oneHit)
-                                return;
-                            break;
-                        }
+                        ExitHandle(values);
+                        return;
                     }
-                    else
-                        hits[i] = 0;
                 }
-                if (exitKey != null)
-                    if (temp_s.Equals(exitKey[exitHits]))
-                    {
-                        if (++exitHits == exitKey.Length)
-                        {
-                            Handle(exitKey);
-                            return;
-                        }
-                    }
-                    else
-                        exitHits = 0;
             }
 
-            if (!toEnd)
+            if (!ignoreEnd)
                 throw new EndOfSequenceParseException();
+            ExitHandle(values);
+        }
+
+        bool CheckKeys(Transition[] transitions, Tsource value, out Transition result)
+        {
+            foreach(var t in transitions)
+            {
+                if(t.Try(value))
+                {
+                    foreach (var tt in transitions)
+                        tt.ZeroHits();
+                    result = t;
+                    return true;
+                }
+            }
+            result = default(Transition);
+            return false;
+        }
+
+        public struct Transition
+        {
+            public Tsource[] key;
+            public Action handler;
+            public ParseNode<Tsource> node;
+            public bool isExit;
+
+            public Transition(Tsource[] key)
+            {
+                this.key = key;
+                handler = null;
+                node = null;
+                isExit = false;
+
+                hits = 0;
+            }
+
+            private int hits;
+            public bool Try(Tsource value) { if (key[hits].Equals(value)) return ++hits == key.Length ? true : false; else { hits = 0; return false; } }
+            public void ZeroHits() { hits = 0; }
 
         }
-        void Handle(Tsource[] key)
+        class ArraySafe<TElement> where TElement : struct // else it has no meaning
         {
-            values.RemoveRange(values.Count - key.Length, key.Length);
-            Handle(values, key);
-            values.Clear();
-            ZeroHits();
-        }
-        void ZeroHits()
-        {
-            for (int i = 0; i < hits.Length; i++)
-                hits[i] = 0;
+            private TElement[] array;
+            public ArraySafe(TElement[] array) { this.array = array; }
 
-            exitHits = 0;
+            public TElement[] Get() { TElement[] t = new TElement[array.Length]; array.CopyTo(t, 0); return t; }
+
+            public static implicit operator ArraySafe<TElement>(TElement[] array) { return new ArraySafe<TElement>(array); }
+            public static implicit operator TElement[](ArraySafe<TElement> array) { return array.Get(); }
         }
     }
 
@@ -105,6 +126,7 @@ namespace MyLib.Parsing
         None = 0,
         OneHit = 1,
         ToEnd = 2,
+
     }
 
     public class EndOfSequenceParseException: Exception

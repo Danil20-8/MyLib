@@ -7,27 +7,25 @@ namespace MyLib.Parsing
 {
     public class CustomParseNode<Tsource> : ParseNode<Tsource>
     {
-        Action<List<Tsource>, Tsource[]> handle;
+        Action<List<Tsource>> enterHandle;
+        Action<List<Tsource>> exitHandle;
 
-
-        public CustomParseNode(Action<List<Tsource>, Tsource[]> handle, Tsource[] exitKey) : this(handle, exitKey, new Tsource[0][], new ParseNode<Tsource>[0])
+        public CustomParseNode(Action<List<Tsource>> enterHandle, Action<List<Tsource>> exitHandle, Transition[] transits, bool ignoreEnd = false)
+            : base(transits, ignoreEnd)
         {
-        }
-        public CustomParseNode(Action<List<Tsource>, Tsource[]> handle, Tsource[] exitKey, ParseNodeFlags flags) : this(handle, exitKey, new Tsource[0][], new ParseNode<Tsource>[0], flags)
-        {
-        }
-        public CustomParseNode(Action<List<Tsource>, Tsource[]> handle, Tsource[] exitKey, Tsource[][] keys, ParseNode<Tsource>[] nodes) : this(handle, exitKey, keys, nodes, ParseNodeFlags.None)
-        {
-        }
-        public CustomParseNode(Action<List<Tsource>, Tsource[]> handle, Tsource[] exitKey, Tsource[][] keys, ParseNode<Tsource>[] nodes, ParseNodeFlags flags)
-            : base(exitKey, keys, nodes, flags)
-        {
-            this.handle = handle;
+            this.enterHandle = enterHandle;
+            this.exitHandle = exitHandle;
         }
 
-        protected override void Handle(List<Tsource> values, Tsource[] key)
+        protected override void EnterHandle(List<Tsource> values)
         {
-            handle(values, key);
+            if(enterHandle != null)
+                enterHandle(values);
+        }
+        protected override void ExitHandle(List<Tsource> values)
+        {
+            if(exitHandle != null)
+                exitHandle(values);
         }
     }
 }
