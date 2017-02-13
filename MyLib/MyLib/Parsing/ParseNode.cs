@@ -2,105 +2,85 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using MyLib.Algoriphms;
 
 namespace MyLib.Parsing
 {
     public abstract class ParseNode<Tsource>
     {
         // saving nodes in multithreading usage. you cannot change it
-        ArraySafe<Transition> nodes;
+        Transition[] nodes;
         readonly ParseNodeFlags flags;
         Tsource[] trimKeys;
 
         bool ignoreEnd { get { return (flags & ParseNodeFlags.IgnoreEnd) != 0; } }
-        bool clearOnBack { get { return (flags & ParseNodeFlags.DontClearOnBack) != ParseNodeFlags.DontClearOnBack; } }
 
         protected abstract void EnterHandle(List<Tsource> values);
         protected abstract void ExitHandle(List<Tsource> values);
 
-        public ParseNode(Transition[] transits, ParseNodeFlags flags)
+        public ParseNode(ParseNodeFlags flags = ParseNodeFlags.None)
+            :this(new Tsource[0], flags)
         {
-            this.nodes = transits;
-            this.trimKeys = new Tsource[0];
+        }
+
+        public ParseNode(Tsource[] trimKeys, ParseNodeFlags flags = ParseNodeFlags.None)
+        {
+            this.trimKeys = trimKeys;
             this.flags = flags;
         }
 
         public ParseNode(Transition[] transits, Tsource[] trimKeys, ParseNodeFlags flags = ParseNodeFlags.None)
         {
-            this.nodes = transits;
             this.trimKeys = trimKeys;
             this.flags = flags;
+            SetTransitions(transits);
         }
 
         public void SetTransitions(Transition[] transitions)
         {
+            if (!ignoreEnd)
+                if (transitions.All(t => t.isExit == false))
+                    throw new Exception("Not igoring end ParseNode has to contain exit transition");
             this.nodes = transitions;
         }
 
         public void Parse(IEnumerable<Tsource> source)
         {
-            var e = source.GetEnumerator();  // if enumerator is struct?
-            Parse(ref e, new List<Tsource>());
+            new SequenceReader(source).MoveTo(this);
         }
 
-        void Parse(ref IEnumerator<Tsource> source, List<Tsource> values)
+        void Parse(SequenceReader sr)
         {
-            EnterHandle(values);
-            values.Clear();
+            EnterHandle(sr.values);
+            sr.values.Clear();
 
-            Transition[] ts = nodes;
-
-            Tsource temp_s;
-            while (source.MoveNext())
+            while(sr.Next() != -1)
             {
-                temp_s = source.Current;
+                Transition transition = sr.transition;
 
-                foreach (var key in trimKeys)
-                    if (key.Equals(temp_s))
-                        goto SKIP_ELEMENT;
-                values.Add(temp_s);
-                SKIP_ELEMENT:
-                Transition transition;
+                if (transition.clearKeyBuffer)
+                    sr.ClearKey();
 
-                if (CheckKeys(ts, temp_s, out transition))
+                if (transition.noZero && sr.values.Count == 0)
+                    continue;
+
+                if (transition.handler != null)
+                    transition.handler();
+                if (transition.node != null)
+                    sr.MoveTo(transition.node);
+                if (transition.isExit)
                 {
-                    int keyLength = transition.GetKeyLength(trimKeys);
-                    values.RemoveRange(values.Count - keyLength, keyLength); // No keys
-
-                    if (transition.handler != null)
-                        transition.handler();
-                    if (transition.node != null)
-                        transition.node.Parse(ref source, values);
-                    if (transition.isExit)
-                    {
-                        ExitHandle(values);
-                        return;
-                    }
-
-                    if(clearOnBack)
-                        values.Clear();
+                    ExitHandle(sr.values);
+                    return;
                 }
+
+                if (transition.clearOnBack)
+                    sr.values.Clear();
             }
 
             if (!ignoreEnd)
                 throw new EndOfSequenceParseException();
-            ExitHandle(values);
-        }
-
-        bool CheckKeys(Transition[] transitions, Tsource value, out Transition result)
-        {
-            foreach(var t in transitions)
-            {
-                if(t.Try(value))
-                {
-                    foreach (var tt in transitions)
-                        tt.ZeroHits();
-                    result = t;
-                    return true;
-                }
-            }
-            result = default(Transition);
-            return false;
+            ExitHandle(sr.values);
         }
 
         public struct Transition
@@ -108,45 +88,127 @@ namespace MyLib.Parsing
             public Tsource[] key;
             public Action handler;
             public ParseNode<Tsource> node;
-            public bool isExit;
-
-            public Transition(Tsource[] key)
-            {
-                this.key = key;
-                handler = null;
-                node = null;
-                isExit = false;
-
-                hits = 0;
-            }
-
-            public int GetKeyLength(Tsource[] trimKeys)
-            {
-                if (trimKeys.Length == 0) return key.Length;
-                int length = 0;
-                foreach (var e in key) {
-                    foreach (var tk in trimKeys)
-                        if (e.Equals(tk)) goto TRIM;
-                    ++length;
-                    TRIM:
-                    continue;
-                }
-                return length;
-            }
-            private int hits;
-            public bool Try(Tsource value) { if (key[hits].Equals(value)) return ++hits == key.Length ? true : false; else { hits = 0; return false; } }
-            public void ZeroHits() { hits = 0; }
-
+            public bool isExit { get { return (flags & ParseTransitionFlags.Exit) != 0; } }
+            public bool noZero { get { return (flags & ParseTransitionFlags.NoZero) != 0; } }
+            public bool clearOnBack { get { return (flags & ParseTransitionFlags.DontClearOnBack) != ParseTransitionFlags.DontClearOnBack; } }
+            public bool clearKeyBuffer { get { return (flags & ParseTransitionFlags.DontClearKeyBuffer) != ParseTransitionFlags.DontClearKeyBuffer; } }
+            public ParseTransitionFlags flags;
         }
-        class ArraySafe<TElement> where TElement : struct // else it has no meaning
+
+        class SequenceReader
         {
-            private TElement[] array;
-            public ArraySafe(TElement[] array) { this.array = array; }
+            List<Tsource> _values = new List<Tsource>();
+            Queue<Tsource> keyBuffer = new Queue<Tsource>();
 
-            public TElement[] Get() { TElement[] t = new TElement[array.Length]; array.CopyTo(t, 0); return t; }
+            Transition[] transitions { get { return node.nodes; } }
+            ParseNode<Tsource> node;
+            int[] hits;
+            bool similarKeySize;
+            int maxKeyLength;
+            int result;
+            IEnumerator<Tsource> source;
 
-            public static implicit operator ArraySafe<TElement>(TElement[] array) { return new ArraySafe<TElement>(array); }
-            public static implicit operator TElement[](ArraySafe<TElement> array) { return array.Get(); }
+            public List<Tsource> values { get { return _values; } }
+            public Transition transition { get { return transitions[result]; } }
+            public bool isEnd { get; private set; }
+
+            public SequenceReader(IEnumerable<Tsource> source)
+            {
+                this.source = source.GetEnumerator();
+            }
+
+            public void SetNode(ParseNode<Tsource> node)
+            {
+                this.node = node;
+                if (node != null)
+                {
+                    hits = new int[node.nodes.Length];
+                    similarKeySize = transitions.All(t => t.key.Length == transitions[0].key.Length);
+                    maxKeyLength = transitions.Max(t => t.key.Length);
+                }
+            }
+
+            public void ClearKey()
+            {
+                for (int i = 0; i < transition.key.Length; ++i)
+                    keyBuffer.Dequeue();
+            }
+
+            public void MoveTo(ParseNode<Tsource> node)
+            {
+                var t = this.node;
+                SetNode(node);
+                node.Parse(this);
+                SetNode(t);
+            }
+
+            public int Next()
+            {
+                for (;;)
+                {
+                    while (keyBuffer.Count != maxKeyLength && source.MoveNext())
+                        keyBuffer.Enqueue(source.Current);
+
+                    SetResult(CheckKeys());
+                    if (result != -1)
+                        return result;
+
+                    if (keyBuffer.Count == 0)
+                        break;
+
+                    AddValue(keyBuffer.Dequeue());
+                }
+                isEnd = true;
+                SetResult(-1);
+                return result;
+            }
+
+            void SetResult(int value)
+            {
+                result = value;
+            }
+
+            void AddValue(Tsource value)
+            {
+                foreach (var tk in node.trimKeys)
+                    if (value.Equals(tk))
+                        return;
+                values.Add(value);
+            }
+
+            int CheckKeys()
+            {
+                int maxHits = 0;
+                int maxIndex = 0;
+                foreach(var c in keyBuffer)
+                {
+                    for(int i = 0; i < hits.Length; ++i)
+                    {
+                        if(transitions[i].key.Length != hits[i] && hits[i] != -1)
+                        {
+                            if (transitions[i].key[hits[i]].Equals(c))
+                            {
+                                if (++hits[i] == transitions[i].key.Length)
+                                    if (maxHits < hits[i])
+                                    {
+                                        maxHits = hits[i];
+                                        maxIndex = i;
+                                    }
+                            }
+                            else
+                                hits[i] = -1;
+                        }
+                    }
+                }
+                ZeroHits();
+                return maxHits > 0 ? maxIndex : -1;
+            }
+
+            void ZeroHits()
+            {
+                for (int i = 0; i < hits.Length; ++i)
+                    hits[i] = 0;
+            }
         }
     }
 
@@ -154,7 +216,16 @@ namespace MyLib.Parsing
     {
         None = 0,
         IgnoreEnd = 1,
-        DontClearOnBack = 2,
+
+    }
+
+    public enum ParseTransitionFlags
+    {
+        None = 0,
+        Exit = 1,
+        NoZero = 2,
+        DontClearOnBack = 4,
+        DontClearKeyBuffer = 8,
 
     }
 

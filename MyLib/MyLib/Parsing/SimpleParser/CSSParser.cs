@@ -26,20 +26,20 @@ namespace MyLib.Parsing.SimpleParser
             var stringValue = new StringParseNode(null, null, trimChars,
                 new ParseNode<char>.Transition[]
                 {
-                    new ParseNode<char>.Transition() { key = endStringKey, isExit = true }
+                    new ParseNode<char>.Transition() { key = endStringKey, flags = ParseTransitionFlags.Exit }
                 });
             var valueNode = new StringParseNode(AddOption, AddValue, trimChars,
                 new ParseNode<char>.Transition[]
                 {
-                    new ParseNode<char>.Transition() { key = valueKey, isExit = true },
-                    new ParseNode<char>.Transition() { key = beginStringKey, node = stringValue }
-                }, ParseNodeFlags.DontClearOnBack);
+                    new ParseNode<char>.Transition() { key = valueKey, flags = ParseTransitionFlags.Exit },
+                    new ParseNode<char>.Transition() { key = beginStringKey, node = stringValue, flags = ParseTransitionFlags.DontClearOnBack }
+                });
 
             var optionNode = new StringParseNode(AddClass, null, trimChars,
                 new ParseNode<char>.Transition[]
                 {
                     new ParseNode<char>.Transition() { key = waitingValueKey, node = valueNode },
-                    new ParseNode<char>.Transition() { key = optionsExitKey, isExit = true }
+                    new ParseNode<char>.Transition() { key = optionsExitKey, flags = ParseTransitionFlags.Exit }
                 });
 
             root = new StringParseNode(null, null, trimChars,

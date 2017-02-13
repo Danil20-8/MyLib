@@ -9,41 +9,86 @@ namespace MyLib.Parsing.XML
     {
         readonly char[] trimChars = new char[] { ' ' };
 
-        readonly char[] elementEnter = new char[] { '<' };
-        readonly char[] elementExit = new char[] { '\\', '>' };
+        readonly char[] stringValueKey = new char[] { '\"' };
 
-        readonly char[] attributeWaiting = new char[] { '=' };
-        readonly char[] attributeEnd = new char[] { ' ' };
+        readonly char[] elementEnterKey = new char[] { '<' };
+        readonly char[] elementExitKey = new char[] { '\\', '>' };
+        readonly char[] elementNameKey = new char[] { ' ' };
 
-        readonly char[] elementOpen = new char[] { '>' };
-        readonly char[] elementCloseBegin = new char[] { '<', '\\' };
-        readonly char[] elementCloseEnd = new char[] { '>' };
+        readonly char[] attributeWaitingKey = new char[] { '=' };
+        readonly char[] attributeEndKey = new char[] { ' ' };
+
+        readonly char[] elementOpenKey = new char[] { '>' };
+        readonly char[] elementCloseBeginKey = new char[] { '<', '\\' };
+        readonly char[] elementCloseEndKey = new char[] { '>' };
 
         StringParseNode root;
 
-        Forest<TreeNode<Element>> xmlResult;
+        public Forest<TreeNode<Element>> xmlResult { get; private set; }
 
         public XMLParser()
         {
-            StringParseNode attributeNode = new StringParseNode(null, null, trimChars,
+            root = new StringParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd);
+            StringParseNode elementName = new StringParseNode(null, null, trimChars);
+            StringParseNode elementNode = new StringParseNode(AddElement, null, trimChars);
+            StringParseNode nestedElementsNode = new StringParseNode(null, null, trimChars);
+            StringParseNode closeElementNode = new StringParseNode(null, CloseElement, trimChars);
+
+            StringParseNode attributeNode = new StringParseNode(AddAttributeName, AddAttributeValue, trimChars);
+            StringParseNode stringValue = new StringParseNode(null, null, trimChars);
+
+
+            root.SetTransitions(
                 new ParseNode<char>.Transition[]
                 {
-                    new ParseNode<char>.Transition() { key = attributeEnd, isExit = true }
+                    new ParseNode<char>.Transition() { key = elementEnterKey, node = elementName }
+                });
+            // Elements
+            elementName.SetTransitions(
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition { key = elementNameKey, node = elementNode, flags = ParseTransitionFlags.NoZero | ParseTransitionFlags.Exit },
+                    new ParseNode<char>.Transition { key = elementOpenKey, node = elementNode, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
+                    new ParseNode<char>.Transition { key = elementExitKey, node = elementNode, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer }
                 });
 
-            StringParseNode elementNode = new StringParseNode(null, null, trimChars,
+            elementNode.SetTransitions(
                 new ParseNode<char>.Transition[]
                 {
-                    new ParseNode<char>.Transition() { key = elementExit, isExit = true },
-                    new ParseNode<char>.Transition() { key = elementOpen },
-                    new ParseNode<char>.Transition() { key = attributeWaiting }
+                    new ParseNode<char>.Transition() { key = elementExitKey, handler = CloseElement, flags = ParseTransitionFlags.Exit },
+                    new ParseNode<char>.Transition() { key = elementOpenKey, node = nestedElementsNode, flags = ParseTransitionFlags.Exit },
+                    new ParseNode<char>.Transition() { key = attributeWaitingKey, node = attributeNode }
                 });
 
-            root = new StringParseNode(null, null, trimChars,
+            nestedElementsNode.SetTransitions(
                 new ParseNode<char>.Transition[]
                 {
-                    new ParseNode<char>.Transition() { key = elementEnter, node = elementNode }
-                }, ParseNodeFlags.IgnoreEnd);
+                    new ParseNode<char>.Transition { key = elementEnterKey, node = elementName },
+                    new ParseNode<char>.Transition { key = elementCloseBeginKey, node = closeElementNode, flags = ParseTransitionFlags.Exit }
+                });
+
+            closeElementNode.SetTransitions(
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition { key = elementCloseEndKey, flags = ParseTransitionFlags.Exit }
+                });
+
+            // Attributes
+            attributeNode.SetTransitions(
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition { key = attributeEndKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.NoZero },
+                    new ParseNode<char>.Transition { key = elementOpenKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
+                    new ParseNode<char>.Transition { key = elementExitKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
+                    new ParseNode<char>.Transition { key = stringValueKey, node = stringValue, flags = ParseTransitionFlags.DontClearOnBack | ParseTransitionFlags.Exit }
+                });
+
+            stringValue.SetTransitions(
+                new ParseNode<char>.Transition[]
+                {
+                    new ParseNode<char>.Transition { key = stringValueKey, flags = ParseTransitionFlags.Exit }
+                });
+
         }
 
         public void Parse(IEnumerable<char> source)
@@ -63,21 +108,33 @@ namespace MyLib.Parsing.XML
             }
         }
         Stack<TreeNode<Element>> element = new Stack<TreeNode<Element>>();
-        public void AddElement(string value)
+        void AddElement(string value)
         {
             currElement = new TreeNode<Element>(new Element { name = value, attributes = new Dictionary<string, string>() });
         }
-        public void CloseElement()
+        void CloseElement()
         {
             element.Pop();
         }
-        public void CloseElement(string value)
+        void CloseElement(string value)
         {
             if (currElement.item.name == value)
                 element.Pop();
             else
                 throw new Exception("Syntax error");
         }
+
+        string attributeName;
+        void AddAttributeName(string name)
+        {
+            attributeName = name;
+        }
+
+        void AddAttributeValue(string value)
+        {
+            currElement.item.attributes.Add(attributeName, value);
+        }
+
         public struct Element
         {
             public string name;

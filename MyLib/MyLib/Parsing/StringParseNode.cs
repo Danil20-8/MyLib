@@ -10,6 +10,12 @@ namespace MyLib.Parsing
         Action<string> enterHandle;
         Action<string> exitHandle;
 
+        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, ParseNodeFlags flags = ParseNodeFlags.None)
+            : base(trimChars, flags)
+        {
+            this.enterHandle = enterHandle;
+            this.exitHandle = exitHandle;
+        }
 
         public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, Transition[] transits, ParseNodeFlags flags = ParseNodeFlags.None)
             : base(transits, trimChars, flags)
