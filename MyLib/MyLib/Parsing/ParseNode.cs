@@ -8,7 +8,6 @@ namespace MyLib.Parsing
 {
     public abstract class ParseNode<Tsource>
     {
-        // saving nodes in multithreading usage. you cannot change it
         Transition[] nodes;
         readonly ParseNodeFlags flags;
         Tsource[] trimKeys;
@@ -103,7 +102,6 @@ namespace MyLib.Parsing
             Transition[] transitions { get { return node.nodes; } }
             ParseNode<Tsource> node;
             int[] hits;
-            bool similarKeySize;
             int maxKeyLength;
             int result;
             IEnumerator<Tsource> source;
@@ -123,7 +121,6 @@ namespace MyLib.Parsing
                 if (node != null)
                 {
                     hits = new int[node.nodes.Length];
-                    similarKeySize = transitions.All(t => t.key.Length == transitions[0].key.Length);
                     maxKeyLength = transitions.Max(t => t.key.Length);
                 }
             }
@@ -180,6 +177,7 @@ namespace MyLib.Parsing
             {
                 int maxHits = 0;
                 int maxIndex = 0;
+                int miss = 0;
                 foreach(var c in keyBuffer)
                 {
                     for(int i = 0; i < hits.Length; ++i)
@@ -195,11 +193,16 @@ namespace MyLib.Parsing
                                         maxIndex = i;
                                     }
                             }
-                            else
+                            else {
+                                if (++miss == hits.Length - 1 && maxHits > 0)
+                                    goto ONE_OF_ALL_FOUNDED;
+
                                 hits[i] = -1;
+                            }
                         }
                     }
                 }
+                ONE_OF_ALL_FOUNDED:
                 ZeroHits();
                 return maxHits > 0 ? maxIndex : -1;
             }
