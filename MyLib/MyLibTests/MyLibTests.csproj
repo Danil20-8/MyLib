@@ -52,6 +52,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="Parsing\TestParsing.cs" />
     <Compile Include="TestAttributesSerialization.cs" />
     <Compile Include="TestNullBinder.cs" />
     <Compile Include="TestTrees.cs" />

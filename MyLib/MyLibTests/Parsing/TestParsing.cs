@@ -30,26 +30,30 @@ namespace MyLibTests.Parsing
         {
             string source =
                 @"<a name=xml>
-                    <b name= nested\>
-                    <c\>
+                    <b name= nested/>
+                    <c/>
                     <d>
-                        <e\>
-                    <\d>
-                <\a>";
+                        <e> Value </e>
+                    </d>
+                </a>";
             XMLParser parser = new XMLParser();
-            parser.Parse(source);
-            var result = parser.xmlResult;
+            
+            var result = parser.Parse(source);
 
-            var element = result.trees.First();
+            var element = result.childs.First();
             var nested = element.childs.First();
 
-            Assert.AreEqual("a", element.item.name);
-            Assert.AreEqual("name", element.item.attributes.Keys.First());
-            Assert.AreEqual("xml", element.item.attributes.Values.First());
+            Assert.AreEqual("a", element.name);
+            Assert.AreEqual("name", element.attributes.Keys.First());
+            Assert.AreEqual("xml", element.attributes.Values.First());
 
-            Assert.AreEqual("b", nested.item.name);
-            Assert.AreEqual("name", nested.item.attributes.Keys.First());
-            Assert.AreEqual("nested", nested.item.attributes.Values.First());
+            Assert.AreEqual("b", nested.name);
+            Assert.AreEqual("name", nested.attributes.Keys.First());
+            Assert.AreEqual("nested", nested.attributes.Values.First());
+
+            var dElement = element.childs.Find(c => c.name == "d");
+            var eElement = dElement.childs.First();
+            Assert.AreEqual(" Value ", eElement.value);
         }
     }
 

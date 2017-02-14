@@ -163,6 +163,27 @@ namespace MyLib.Parsing
             void SetResult(int value)
             {
                 result = value;
+                if(result != -1)
+                {
+                    for (int i = values.Count - 1; i >= 0; --i)
+                        if (!HasToBeTrim(values[i]))
+                            break;
+                        else
+                            values.RemoveAt(i);
+                    for(int i = 0; i < values.Count; ++i)
+                        if (!HasToBeTrim(values[i]))
+                            break;
+                        else
+                            values.RemoveAt(i);
+                }
+            }
+
+            bool HasToBeTrim(Tsource value)
+            {
+                foreach (var tk in node.trimKeys)
+                    if (value.Equals(tk))
+                        return true;
+                return false;
             }
 
             void AddValue(Tsource value)

@@ -12,30 +12,30 @@ namespace MyLib.Parsing.XML
         readonly char[] stringValueKey = new char[] { '\"' };
 
         readonly char[] elementEnterKey = new char[] { '<' };
-        readonly char[] elementExitKey = new char[] { '\\', '>' };
+        readonly char[] elementExitKey = new char[] { '/', '>' };
         readonly char[] elementNameKey = new char[] { ' ' };
 
         readonly char[] attributeWaitingKey = new char[] { '=' };
         readonly char[] attributeEndKey = new char[] { ' ' };
 
         readonly char[] elementOpenKey = new char[] { '>' };
-        readonly char[] elementCloseBeginKey = new char[] { '<', '\\' };
+        readonly char[] elementCloseBeginKey = new char[] { '<', '/' };
         readonly char[] elementCloseEndKey = new char[] { '>' };
 
         StringParseNode root;
 
-        public Forest<TreeNode<Element>> xmlResult { get; private set; }
+        public IXMLElement xmlResult { get; private set; }
 
         public XMLParser()
         {
             root = new StringParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd);
             StringParseNode elementName = new StringParseNode(null, null, trimChars);
             StringParseNode elementNode = new StringParseNode(AddElement, null, trimChars);
-            StringParseNode nestedElementsNode = new StringParseNode(null, null, trimChars);
-            StringParseNode closeElementNode = new StringParseNode(null, CloseElement, trimChars);
+            StringParseNode nestedElementsNode = new StringParseNode(null, null, new char[0]);
+            StringParseNode closeElementNode = new StringParseNode(SetValue, CloseElement, trimChars);
 
             StringParseNode attributeNode = new StringParseNode(AddAttributeName, AddAttributeValue, trimChars);
-            StringParseNode stringValue = new StringParseNode(null, null, trimChars);
+            StringParseNode stringValue = new StringParseNode(null, null, new char[0]);
 
 
             root.SetTransitions(
@@ -91,26 +91,29 @@ namespace MyLib.Parsing.XML
 
         }
 
-        public void Parse(IEnumerable<char> source)
+        public XMLRoot Parse(IEnumerable<char> source)
         {
-            xmlResult = new Forest<TreeNode<Element>>();
+            xmlResult = new XMLRoot();
             root.Parse(source);
+            return xmlResult as XMLRoot;
         }
 
-        TreeNode<Element> currElement { get { return element.Any() ? element.Peek() : null; }
-            set {
-                var t = currElement;
-                if (t != null)
-                    t.AddNode(value);
-                else
-                    xmlResult.AddTree(value);
-                element.Push(value);
-            }
+        public TRoot Parse<TRoot>(IEnumerable<char> source, TRoot xmlRoot) where TRoot : class, IXMLElement
+        {
+            xmlResult = xmlRoot;
+            root.Parse(source);
+            return xmlResult as TRoot;
         }
-        Stack<TreeNode<Element>> element = new Stack<TreeNode<Element>>();
+
+        IXMLElement currElement { get { return element.Any() ? element.Peek() : null; } }
+        Stack<IXMLElement> element = new Stack<IXMLElement>();
         void AddElement(string value)
         {
-            currElement = new TreeNode<Element>(new Element { name = value, attributes = new Dictionary<string, string>() });
+            var curr = currElement;
+            if (curr != null)
+                element.Push(curr.AddElement(value));
+            else
+                element.Push(xmlResult.AddElement(value));
         }
         void CloseElement()
         {
@@ -118,7 +121,7 @@ namespace MyLib.Parsing.XML
         }
         void CloseElement(string value)
         {
-            if (currElement.item.name == value)
+            if (currElement.name == value)
                 element.Pop();
             else
                 throw new Exception("Syntax error");
@@ -132,13 +135,80 @@ namespace MyLib.Parsing.XML
 
         void AddAttributeValue(string value)
         {
-            currElement.item.attributes.Add(attributeName, value);
+            currElement.AddAttribute(attributeName, value);
         }
 
-        public struct Element
+        void SetValue(string value)
         {
-            public string name;
-            public Dictionary<string, string> attributes;
+            currElement.SetValue(value);
+        }
+    }
+
+    public interface IXMLElement
+    {
+        string name { get; }
+
+        IXMLElement AddElement(string name);
+        void AddAttribute(string name, string value);
+        void SetValue(string value);
+    }
+
+    public class XMLRoot : IXMLElement
+    {
+        public List<XMLElement> childs { get; private set; }
+
+        string IXMLElement.name { get{return "XMLRoot"; } }
+
+        public XMLRoot()
+        {
+            childs = new List<XMLElement>();
+        }
+
+        void IXMLElement.AddAttribute(string name, string value)
+        {
+        }
+
+        public IXMLElement AddElement(string name)
+        {
+            XMLElement e = new XMLElement(name);
+            childs.Add(e);
+            return e;
+        }
+
+        void IXMLElement.SetValue(string value)
+        {
+        }
+    }
+
+    public class XMLElement : IXMLElement
+    {
+        public string name { get; private set; }
+        public string value { get; private set; }
+        public Dictionary<string, string> attributes { get; private set; }
+        public List<XMLElement> childs { get; private set; }
+
+        public XMLElement(string name)
+        {
+            this.name = name;
+            attributes = new Dictionary<string, string>();
+            childs = new List<XMLElement>();
+        }
+
+        public IXMLElement AddElement(string name)
+        {
+            XMLElement e = new XMLElement(name);
+            childs.Add(e);
+            return e;
+        }
+
+        public void AddAttribute(string name, string value)
+        {
+            attributes.Add(name, value);
+        }
+
+        public void SetValue(string value)
+        {
+            this.value = value;
         }
     }
 }
