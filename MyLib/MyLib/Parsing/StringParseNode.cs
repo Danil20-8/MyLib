@@ -5,34 +5,43 @@ using System.Text;
 
 namespace MyLib.Parsing
 {
-    public class StringParseNode : ParseNode<char>
+    public class StringParseNode<Tcontroller> : ParseNode<char, string, Tcontroller> where Tcontroller : IParseController
     {
-        Action<string> enterHandle;
-        Action<string> exitHandle;
+        Action<string, Tcontroller> enterHandle;
+        Action<string, Tcontroller> exitHandle;
 
-        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, ParseNodeFlags flags = ParseNodeFlags.None)
-            : base(trimChars, flags)
+        public StringParseNode(Action<string, Tcontroller> enterHandle, Action<string, Tcontroller> exitHandle, char[] trimChars, ParseNodeFlags flags = ParseNodeFlags.None, Transition[] transitions = null)
+            : base(new StringValueHandler(trimChars), flags, transitions)
         {
             this.enterHandle = enterHandle;
             this.exitHandle = exitHandle;
         }
 
-        public StringParseNode(Action<string> enterHandle, Action<string> exitHandle, char[] trimChars, Transition[] transits, ParseNodeFlags flags = ParseNodeFlags.None)
-            : base(transits, trimChars, flags)
-        {
-            this.enterHandle = enterHandle;
-            this.exitHandle = exitHandle;
-        }
-
-        protected override void EnterHandle(List<char> values)
+        protected override void EnterHandle(string value, Tcontroller controller)
         {
             if(enterHandle != null)
-                enterHandle(new string(values.ToArray()));
+                enterHandle(value, controller);
         }
-        protected override void ExitHandle(List<char> values)
+        protected override void ExitHandle(string value, Tcontroller controller)
         {
             if(exitHandle != null)
-                exitHandle(new string(values.ToArray()));
+                exitHandle(value, controller);
+        }
+    }
+
+    public class StringValueHandler : IParseValueHandler<char, string>
+    {
+        DefaultValueHandler<char> dvh;
+
+        public StringValueHandler(char[] trimChars)
+        {
+            dvh = new DefaultValueHandler<char>(trimChars);
+        }
+
+        public Value<string> GetValue(List<char> source)
+        {
+            var result = dvh.GetValue(source);
+            return new Value<string> { hasValue = result.hasValue, value = new string(result.value.ToArray()) };
         }
     }
 }

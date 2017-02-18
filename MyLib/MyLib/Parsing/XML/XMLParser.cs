@@ -5,6 +5,10 @@ using System.Text;
 
 namespace MyLib.Parsing.XML
 {
+
+    /// <summary>
+    /// Thread safe implementation
+    /// </summary>
     public class XMLParser
     {
         readonly char[] trimChars = new char[] { ' ' };
@@ -22,126 +26,108 @@ namespace MyLib.Parsing.XML
         readonly char[] elementCloseBeginKey = new char[] { '<', '/' };
         readonly char[] elementCloseEndKey = new char[] { '>' };
 
-        StringParseNode root;
-
-        public IXMLElement xmlResult { get; private set; }
+        XMLParseNode root;
 
         public XMLParser()
         {
-            root = new StringParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd);
-            StringParseNode elementName = new StringParseNode(null, null, trimChars);
-            StringParseNode elementNode = new StringParseNode(AddElement, null, trimChars);
-            StringParseNode nestedElementsNode = new StringParseNode(null, null, new char[0]);
-            StringParseNode closeElementNode = new StringParseNode(SetValue, CloseElement, trimChars);
+            root = new XMLParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd);
+            XMLParseNode elementName = new XMLParseNode(null, null, trimChars);
+            XMLParseNode elementNode = new XMLParseNode(AddElement, null, trimChars);
+            XMLParseNode nestedElementsNode = new XMLParseNode(null, null, new char[0]);
+            XMLParseNode closeElementNode = new XMLParseNode(SetValue, CloseElement, trimChars);
 
-            StringParseNode attributeNode = new StringParseNode(AddAttributeName, AddAttributeValue, trimChars);
-            StringParseNode stringValue = new StringParseNode(null, null, new char[0]);
+            XMLParseNode attributeNode = new XMLParseNode(AddAttributeName, AddAttributeValue, trimChars);
+            XMLParseNode stringValue = new XMLParseNode(null, null, new char[0]);
 
 
             root.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = elementEnterKey, node = elementName }
-                });
+                root.newTransitions(
+                    root.newTransition(elementEnterKey, elementName)
+                ));
             // Elements
             elementName.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition { key = elementNameKey, node = elementNode, flags = ParseTransitionFlags.NoZero | ParseTransitionFlags.Exit },
-                    new ParseNode<char>.Transition { key = elementOpenKey, node = elementNode, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
-                    new ParseNode<char>.Transition { key = elementExitKey, node = elementNode, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer }
-                });
+                elementName.newTransitions(
+                    elementName.newTransition(elementNameKey, elementNode, ParseTransitionFlags.NoZero | ParseTransitionFlags.Exit ),
+                    elementName.newTransition(elementOpenKey, elementNode, ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer ),
+                    elementName.newTransition(elementExitKey, elementNode, ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer )
+                ));
 
             elementNode.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = elementExitKey, handler = CloseElement, flags = ParseTransitionFlags.Exit },
-                    new ParseNode<char>.Transition() { key = elementOpenKey, node = nestedElementsNode, flags = ParseTransitionFlags.Exit },
-                    new ParseNode<char>.Transition() { key = attributeWaitingKey, node = attributeNode }
-                });
+                elementNode.newTransitions(
+                    elementNode.newTransition(elementExitKey, CloseElement, ParseTransitionFlags.Exit ),
+                    elementNode.newTransition(elementOpenKey, nestedElementsNode, ParseTransitionFlags.Exit ),
+                    elementNode.newTransition(attributeWaitingKey, attributeNode )
+                ));
 
             nestedElementsNode.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition { key = elementEnterKey, node = elementName },
-                    new ParseNode<char>.Transition { key = elementCloseBeginKey, node = closeElementNode, flags = ParseTransitionFlags.Exit }
-                });
+                nestedElementsNode.newTransitions(
+                    nestedElementsNode.newTransition(elementEnterKey, elementName ),
+                    nestedElementsNode.newTransition(elementCloseBeginKey, closeElementNode, ParseTransitionFlags.Exit )
+                ));
 
             closeElementNode.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition { key = elementCloseEndKey, flags = ParseTransitionFlags.Exit }
-                });
+                closeElementNode.newTransitions(
+                    closeElementNode.newTransition(elementCloseEndKey, ParseTransitionFlags.Exit )
+                ));
 
             // Attributes
             attributeNode.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition { key = attributeEndKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.NoZero },
-                    new ParseNode<char>.Transition { key = elementOpenKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
-                    new ParseNode<char>.Transition { key = elementExitKey, flags = ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer },
-                    new ParseNode<char>.Transition { key = stringValueKey, node = stringValue, flags = ParseTransitionFlags.DontClearOnBack | ParseTransitionFlags.Exit }
-                });
+                attributeNode.newTransitions(
+                    attributeNode.newTransition(attributeEndKey, ParseTransitionFlags.Exit | ParseTransitionFlags.NoZero ),
+                    attributeNode.newTransition(elementOpenKey, ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer),
+                    attributeNode.newTransition(elementExitKey, ParseTransitionFlags.Exit | ParseTransitionFlags.DontClearKeyBuffer),
+                    attributeNode.newTransition(stringValueKey, stringValue, ParseTransitionFlags.DontClearOnBack | ParseTransitionFlags.Exit )
+                ));
 
             stringValue.SetTransitions(
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition { key = stringValueKey, flags = ParseTransitionFlags.Exit }
-                });
+                stringValue.newTransitions(
+                    stringValue.newTransition(stringValueKey, ParseTransitionFlags.Exit )
+                ));
 
         }
 
-        public XMLRoot Parse(IEnumerable<char> source)
+        public XMLModule Parse(IEnumerable<char> source)
         {
-            xmlResult = new XMLRoot();
-            root.Parse(source);
-            return xmlResult as XMLRoot;
+            return (XMLModule) root.Parse(source, new XMLParseController(new XMLModule()));
         }
 
-        public TRoot Parse<TRoot>(IEnumerable<char> source, TRoot xmlRoot) where TRoot : class, IXMLElement
+        public TXMLModule Parse<TXMLModule>(IEnumerable<char> source, TXMLModule xmlRoot) where TXMLModule : class, IXMLModule
         {
-            xmlResult = xmlRoot;
-            root.Parse(source);
-            return xmlResult as TRoot;
+            return (TXMLModule) root.Parse(source, new XMLParseController(xmlRoot));
         }
 
-        IXMLElement currElement { get { return element.Any() ? element.Peek() : null; } }
-        Stack<IXMLElement> element = new Stack<IXMLElement>();
-        void AddElement(string value)
+        void AddElement(string value, XMLParseController controller)
         {
-            var curr = currElement;
-            if (curr != null)
-                element.Push(curr.AddElement(value));
-            else
-                element.Push(xmlResult.AddElement(value));
+            controller.AddElement(value);
         }
-        void CloseElement()
+        void CloseElement(XMLParseController controller)
         {
-            element.Pop();
+            controller.CloseElement();
         }
-        void CloseElement(string value)
+        void CloseElement(string value, XMLParseController controller)
         {
-            if (currElement.name == value)
-                element.Pop();
-            else
-                throw new Exception("Syntax error");
+            controller.CloseElement(value);
         }
 
-        string attributeName;
-        void AddAttributeName(string name)
+        void AddAttributeName(string name, XMLParseController controller)
         {
-            attributeName = name;
+            controller.AddAttributeName(name);
         }
 
-        void AddAttributeValue(string value)
+        void AddAttributeValue(string value, XMLParseController controller)
         {
-            currElement.AddAttribute(attributeName, value);
+            controller.AddAttributeValue(value);
         }
 
-        void SetValue(string value)
+        void SetValue(string value, XMLParseController controller)
         {
-            currElement.SetValue(value);
+            controller.SetValue(value);
         }
+    }
+
+    public interface IXMLModule
+    {
+        IXMLElement AddElement(string name);
     }
 
     public interface IXMLElement
@@ -153,19 +139,13 @@ namespace MyLib.Parsing.XML
         void SetValue(string value);
     }
 
-    public class XMLRoot : IXMLElement
+    public class XMLModule : IXMLModule
     {
         public List<XMLElement> childs { get; private set; }
 
-        string IXMLElement.name { get{return "XMLRoot"; } }
-
-        public XMLRoot()
+        public XMLModule()
         {
             childs = new List<XMLElement>();
-        }
-
-        void IXMLElement.AddAttribute(string name, string value)
-        {
         }
 
         public IXMLElement AddElement(string name)
@@ -173,10 +153,6 @@ namespace MyLib.Parsing.XML
             XMLElement e = new XMLElement(name);
             childs.Add(e);
             return e;
-        }
-
-        void IXMLElement.SetValue(string value)
-        {
         }
     }
 

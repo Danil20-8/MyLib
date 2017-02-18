@@ -5,11 +5,14 @@ using System.Text;
 
 namespace MyLib.Parsing.SimpleParser
 {
-    public class CSSParser
+    /// <summary>
+    /// Thread unsafe
+    /// </summary>
+    public class CSSParser : IParseController
     {
         public Dictionary<string, Dictionary<string, string>> cssResult = new Dictionary<string, Dictionary<string, string>>();
 
-        StringParseNode root;
+        CSSParseNode root;
 
         readonly char[] trimChars = new char[] { ' ' };
 
@@ -23,46 +26,44 @@ namespace MyLib.Parsing.SimpleParser
 
         public CSSParser()
         {
-            var stringValue = new StringParseNode(null, null, trimChars,
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = endStringKey, flags = ParseTransitionFlags.Exit }
-                });
-            var valueNode = new StringParseNode(AddOption, AddValue, trimChars,
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = valueKey, flags = ParseTransitionFlags.Exit },
-                    new ParseNode<char>.Transition() { key = beginStringKey, node = stringValue, flags = ParseTransitionFlags.DontClearOnBack }
-                });
+            CSSParseNode sample = new CSSParseNode(null, null, null);
 
-            var optionNode = new StringParseNode(AddClass, null, trimChars,
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = waitingValueKey, node = valueNode },
-                    new ParseNode<char>.Transition() { key = optionsExitKey, flags = ParseTransitionFlags.Exit }
-                });
+            var stringValue = new CSSParseNode(null, null, trimChars,
+                transitions: sample.newTransitions(
+                    sample.newTransition(endStringKey, ParseTransitionFlags.Exit )
+                ));
+            var valueNode = new CSSParseNode(AddOption, AddValue, trimChars,
+                transitions : sample.newTransitions(
+                    sample.newTransition(valueKey, ParseTransitionFlags.Exit),
+                    sample.newTransition(beginStringKey, stringValue, ParseTransitionFlags.DontClearOnBack )
+                ));
 
-            root = new StringParseNode(null, null, trimChars,
-                new ParseNode<char>.Transition[]
-                {
-                    new ParseNode<char>.Transition() { key = preNameKey, handler = MarkAsExist },
-                    new ParseNode<char>.Transition() { key = optionsEnterKey, node = optionNode }
-                }, ParseNodeFlags.IgnoreEnd);
+            var optionNode = new CSSParseNode(AddClass, null, trimChars,
+                transitions: sample.newTransitions(
+                    sample.newTransition(waitingValueKey, valueNode ),
+                    sample.newTransition(optionsExitKey, ParseTransitionFlags.Exit )
+                ));
+
+            root = new CSSParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd,
+                sample.newTransitions(
+                    sample.newTransition(preNameKey, MarkAsExist ),
+                    sample.newTransition(optionsEnterKey, optionNode )
+                ));
         }
 
         public void Parse(IEnumerable<char> source)
         {
             cssResult = new Dictionary<string, Dictionary<string, string>>();
-            root.Parse(source);
+            root.Parse(source, this);
         }
         bool exist = false;
-        void MarkAsExist()
+        void MarkAsExist(CSSParser parser)
         {
             exist = true;
         }
 
         Dictionary<string, string> currClass;
-        void AddClass(string value)
+        void AddClass(string value, CSSParser parser)
         {
             if (exist)
             {
@@ -77,14 +78,19 @@ namespace MyLib.Parsing.SimpleParser
         }
 
         string optionName;
-        void AddOption(string name)
+        void AddOption(string name, CSSParser parse)
         {
             optionName = name;
         }
 
-        void AddValue(string value)
+        void AddValue(string value, CSSParser parser)
         {
             currClass.Add(optionName, value);
+        }
+
+        object IParseController.GetResult()
+        {
+            return cssResult;
         }
     }
 }

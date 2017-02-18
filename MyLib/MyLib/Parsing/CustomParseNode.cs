@@ -5,27 +5,27 @@ using System.Text;
 
 namespace MyLib.Parsing
 {
-    public class CustomParseNode<Tsource> : ParseNode<Tsource>
+    public class CustomParseNode<Tsource, Tvalue, Tcontroller> : ParseNode<Tsource, Tvalue, Tcontroller> where Tcontroller : IParseController
     {
-        Action<List<Tsource>> enterHandle;
-        Action<List<Tsource>> exitHandle;
+        Action<Tvalue, Tcontroller> enterHandle;
+        Action<Tvalue, Tcontroller> exitHandle;
 
-        public CustomParseNode(Action<List<Tsource>> enterHandle, Action<List<Tsource>> exitHandle, Transition[] transits, Tsource[] trimKeys, ParseNodeFlags flags = ParseNodeFlags.None)
-            : base(transits, trimKeys, flags)
+        public CustomParseNode(Action<Tvalue, Tcontroller> enterHandle, Action<Tvalue, Tcontroller> exitHandle, IParseValueHandler<Tsource, Tvalue> valueHandler, ParseNodeFlags flags = ParseNodeFlags.None, Transition[] transits = null)
+            : base(valueHandler, flags, transits)
         {
             this.enterHandle = enterHandle;
             this.exitHandle = exitHandle;
         }
 
-        protected override void EnterHandle(List<Tsource> values)
+        protected override void EnterHandle(Tvalue value, Tcontroller controller)
         {
             if(enterHandle != null)
-                enterHandle(values);
+                enterHandle(value, controller);
         }
-        protected override void ExitHandle(List<Tsource> values)
+        protected override void ExitHandle(Tvalue value, Tcontroller controller)
         {
             if(exitHandle != null)
-                exitHandle(values);
+                exitHandle(value, controller);
         }
     }
 }
