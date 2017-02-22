@@ -16,16 +16,18 @@ namespace MyLib.Parsing.XML
         public XMLParseController(IXMLModule targetXMLModule) { this.xmlResult = targetXMLModule; }
 
 
-        IXMLElement currElement { get { return element.Any() ? element.Peek() : null; } }
-        Stack<IXMLElement> element = new Stack<IXMLElement>();
+        ElementData currElement { get { return element.Any() ? element.Peek() : null; } }
+        Stack<ElementData> element = new Stack<ElementData>();
 
         public void AddElement(string value)
         {
             var curr = currElement;
             if (curr != null)
+            {
                 element.Push(curr.AddElement(value));
+            }
             else
-                element.Push(xmlResult.AddElement(value));
+                element.Push(new ElementData(xmlResult.AddElement(value)));
         }
         public void CloseElement()
         {
@@ -53,6 +55,44 @@ namespace MyLib.Parsing.XML
         public void SetValue(string value)
         {
             currElement.SetValue(value);
+        }
+
+        class ElementData : IXMLElement
+        {
+            public IXMLElement element;
+            public bool hasValue;
+
+            public ElementData(IXMLElement element) { this.element = element; this.hasValue = true; }
+
+            public string name
+            {
+                get
+                {
+                    return element.name;
+                }
+            }
+
+            public void AddAttribute(string name, string value)
+            {
+                element.AddAttribute(name, value);
+            }
+
+            public ElementData AddElement(string name)
+            {
+                hasValue = false;
+                return new ElementData(element.AddElement(name));
+            }
+
+            IXMLElement IXMLElement.AddElement(string name)
+            {
+                return AddElement(name);
+            }
+
+            public void SetValue(string value)
+            {
+                if (hasValue)
+                    element.SetValue(value);
+            }
         }
     }
 }
