@@ -157,7 +157,7 @@ namespace MyLib.Parsing
             {
                 for (;;)
                 {
-                    while (keyBuffer.Count != maxKeyLength && source.MoveNext())
+                    while (keyBuffer.Count < maxKeyLength && source.MoveNext())
                         keyBuffer.Enqueue(source.Current);
 
                     SetResult(CheckKeys());
@@ -194,8 +194,13 @@ namespace MyLib.Parsing
                 int maxHits = 0;
                 int maxIndex = 0;
                 int miss = 0;
+
+                int count = 0;
+
                 foreach(var c in keyBuffer)
                 {
+                    if (count == maxKeyLength) // preservation of keyBuffer count greater then max key length
+                        break;
                     for(int i = 0; i < hitsLength; ++i)
                     {
                         if(transitions[i].key.Length != hits[i] && hits[i] != -1)
@@ -217,6 +222,7 @@ namespace MyLib.Parsing
                             }
                         }
                     }
+                    ++count;
                 }
                 ONE_OF_ALL_FOUNDED:
                 ZeroHits();

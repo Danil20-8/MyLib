@@ -30,6 +30,7 @@ namespace MyLibTests.Parsing
         {
             string source =
                 @"<a name=xml>
+                    <!-- nested to a elements <A ... -->
                     <b name= nested/>
                     <c/>
                     <d>

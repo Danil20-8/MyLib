@@ -12,6 +12,7 @@ namespace MyLib.Parsing.XML
     public class XMLParser
     {
         readonly char[] trimChars = new char[] { ' ' };
+        readonly char[] noTrim = new char[0];
 
         readonly char[] stringValueKey = new char[] { '\"' };
 
@@ -26,6 +27,9 @@ namespace MyLib.Parsing.XML
         readonly char[] elementCloseBeginKey = new char[] { '<', '/' };
         readonly char[] elementCloseEndKey = new char[] { '>' };
 
+        readonly char[] commentEnterKey = new char[] { '<', '!', '-', '-' };
+        readonly char[] commentExitKey = new char[] { '-', '-', '>' };
+
         XMLParseNode root;
 
         public XMLParser()
@@ -33,16 +37,19 @@ namespace MyLib.Parsing.XML
             root = new XMLParseNode(null, null, trimChars, ParseNodeFlags.IgnoreEnd);
             XMLParseNode elementName = new XMLParseNode(null, null, trimChars);
             XMLParseNode elementNode = new XMLParseNode(AddElement, null, trimChars);
-            XMLParseNode nestedElementsNode = new XMLParseNode(null, null, new char[0]);
+            XMLParseNode nestedElementsNode = new XMLParseNode(null, null, noTrim);
             XMLParseNode closeElementNode = new XMLParseNode(SetValue, CloseElement, trimChars);
 
             XMLParseNode attributeNode = new XMLParseNode(AddAttributeName, AddAttributeValue, trimChars);
-            XMLParseNode stringValue = new XMLParseNode(null, null, new char[0]);
+            XMLParseNode stringValue = new XMLParseNode(null, null, noTrim);
 
+            XMLParseNode commentNode = new XMLParseNode(null, null, noTrim);
+            var commentEnterTranistion = commentNode.newTransition(commentEnterKey, commentNode);
 
             root.SetTransitions(
                 root.newTransitions(
-                    root.newTransition(elementEnterKey, elementName)
+                    root.newTransition(elementEnterKey, elementName),
+                    commentEnterTranistion
                 ));
             // Elements
             elementName.SetTransitions(
@@ -62,7 +69,8 @@ namespace MyLib.Parsing.XML
             nestedElementsNode.SetTransitions(
                 nestedElementsNode.newTransitions(
                     nestedElementsNode.newTransition(elementEnterKey, elementName ),
-                    nestedElementsNode.newTransition(elementCloseBeginKey, closeElementNode, ParseTransitionFlags.Exit )
+                    nestedElementsNode.newTransition(elementCloseBeginKey, closeElementNode, ParseTransitionFlags.Exit ),
+                    commentEnterTranistion
                 ));
 
             closeElementNode.SetTransitions(
@@ -83,6 +91,13 @@ namespace MyLib.Parsing.XML
                 stringValue.newTransitions(
                     stringValue.newTransition(stringValueKey, ParseTransitionFlags.Exit )
                 ));
+
+            // Comment
+            commentNode.SetTransitions(
+                commentNode.newTransitions(
+                    commentNode.newTransition(commentExitKey, ParseTransitionFlags.Exit)
+                    )
+                );
 
         }
 
