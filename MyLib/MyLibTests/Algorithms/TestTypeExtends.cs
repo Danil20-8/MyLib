@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MyLib.Algoriphms;
+using DRLib.Algoriphms;
 
 namespace MyLibTests.Algorithms
 {

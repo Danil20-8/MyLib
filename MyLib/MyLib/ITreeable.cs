@@ -3,10 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using MyLib.Algoriphms;
-using MyLib.Modern;
+using DRLib.Algoriphms;
+using DRLib.Modern;
 
-namespace MyLib
+namespace DRLib
 {
     public interface ITreeable<Tnode> where Tnode : ITreeable<Tnode>
     {

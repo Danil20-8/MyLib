@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using MyLib.Algoriphms;
+using DRLib.Algoriphms;
 
-namespace MyLib.Parsing
+namespace DRLib.Parsing
 {
     public abstract class ParseNode<Tsource, Tvalue, Tcontroller> where Tcontroller : IParseController
     {

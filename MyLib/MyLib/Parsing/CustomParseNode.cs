@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Parsing
+namespace DRLib.Parsing
 {
     public class CustomParseNode<Tsource, Tvalue, Tcontroller> : ParseNode<Tsource, Tvalue, Tcontroller> where Tcontroller : IParseController
     {

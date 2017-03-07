@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using MyLib.Algoriphms;
-using MyLib.Modern;
+using DRLib.Algoriphms;
+using DRLib.Modern;
 
-namespace MyLib.Serialization
+namespace DRLib.Serialization
 {
     struct SerializedType
     {

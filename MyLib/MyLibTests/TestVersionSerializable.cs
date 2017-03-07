@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MyLib.Serialization;
+using DRLib.Serialization;
 namespace MyLibTests
 {
     [TestClass]

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 
-namespace MyLib.Modern
+namespace DRLib.Modern
 {
     public static class MemberExtends
     {

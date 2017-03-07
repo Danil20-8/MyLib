@@ -2,7 +2,7 @@
 using System.Linq;
 using System;
 
-namespace MyLib.Parsing.XML
+namespace DRLib.Parsing.XML
 {
     public class XMLParseController : IParseController
     {

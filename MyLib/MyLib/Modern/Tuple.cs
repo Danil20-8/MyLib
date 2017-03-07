@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Modern
+namespace DRLib.Modern
 {
     public struct Tuple<T1, T2>
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MyLib.Serialization;
-using MyLib.Serialization.Binders;
+using DRLib.Serialization;
+using DRLib.Serialization.Binders;
 
 
 namespace MyLibTests

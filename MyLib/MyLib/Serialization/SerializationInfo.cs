@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using MyLib.Serialization.Binders;
+using DRLib.Serialization.Binders;
 
-namespace MyLib.Serialization
+namespace DRLib.Serialization
 {
     internal class SerializationTypes
     {

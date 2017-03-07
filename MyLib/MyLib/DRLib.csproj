@@ -7,8 +7,8 @@
     <ProjectGuid>{A74874D2-4CB6-48AE-8563-0B7FC4FE7850}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MyLib</RootNamespace>
-    <AssemblyName>MyLib</AssemblyName>
+    <RootNamespace>DRLib</RootNamespace>
+    <AssemblyName>DRLib</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />

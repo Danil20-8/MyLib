@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MyLib.Parsing.SimpleParser;
-using MyLib.Parsing.XML;
+using DRLib.Parsing.SimpleParser;
+using DRLib.Parsing.XML;
 namespace MyLibTests.Parsing
 {
     [TestClass]

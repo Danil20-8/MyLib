@@ -3,10 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using MyLib.Modern;
-using MyLib.Algoriphms;
-using MyLib.Serialization;
-namespace MyLib
+using DRLib.Modern;
+using DRLib.Algoriphms;
+using DRLib.Serialization;
+namespace DRLib
 {
     public class CustomTree<Tsource, Tnode> : ITreeable<CustomTree<Tsource, Tnode>>
     {

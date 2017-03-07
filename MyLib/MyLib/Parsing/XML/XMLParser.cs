@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Parsing.XML
+namespace DRLib.Parsing.XML
 {
 
     /// <summary>

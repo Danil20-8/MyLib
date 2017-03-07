@@ -62,9 +62,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MyLib\MyLib.csproj">
+    <ProjectReference Include="..\MyLib\DRLib.csproj">
       <Project>{a74874d2-4cb6-48ae-8563-0b7fc4fe7850}</Project>
-      <Name>MyLib</Name>
+      <Name>DRLib</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>

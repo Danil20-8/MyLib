@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using MyLib.Serialization;
+using DRLib.Serialization;
 namespace MyLibTests
 {
     [TestClass]
@@ -96,7 +96,7 @@ namespace MyLibTests
         public void TestTypesCollecting()
         {
             Dynamic d = new Dynamic();
-            var t = new MyLib.TreeNode<int>(1);
+            var t = new DRLib.TreeNode<int>(1);
             t.AddNode(3);
             d.value = t;
             var r = CompactSerializer.CollectDynamicTypes(d);

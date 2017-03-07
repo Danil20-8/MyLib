@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Parsing.SimpleParser
+namespace DRLib.Parsing.SimpleParser
 {
     public class CSSParseNode : StringParseNode<CSSParser>
     {

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 
 
-namespace MyLib.Algoriphms
+namespace DRLib.Algoriphms
 {
     public static class EnumerableExtends
     {
@@ -33,6 +33,18 @@ namespace MyLib.Algoriphms
                 sb.Remove(0, splitter.Length);
             return sb.ToString();
         }
+        public static string ToString<T>(this IEnumerable<T> items, string convertFormat, string separator)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var s in items)
+            {
+                sb.Append(String.Format(convertFormat, s));
+                sb.Append(separator);
+            }
+            sb.Remove(sb.Length - separator.Length, separator.Length);
+            return sb.ToString();
+        }
+
         public static T[] Parse<T>(this string source, char splitter = ' ')
         {
             var parseMethod = typeof(T).GetMethod("Parse", new Type[] { typeof(string) });

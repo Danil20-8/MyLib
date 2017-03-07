@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Serialization.Binders
+namespace DRLib.Serialization.Binders
 {
     public struct NullBinder<T> : IBinder where T: class
     {

@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 using System.IO;
-using MyLib.Modern;
-using MyLib.Algoriphms;
+using DRLib.Modern;
+using DRLib.Algoriphms;
 
-namespace MyLib.Serialization
+namespace DRLib.Serialization
 {
     public partial class CompactSerializer
     {

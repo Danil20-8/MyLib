@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace MyLib.Parsing
+namespace DRLib.Parsing
 {
     public interface IParseValueHandler<TSource, TValue>
     {
