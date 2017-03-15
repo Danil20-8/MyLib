@@ -57,9 +57,10 @@ namespace DRLib.Parsing.SimpleParser
             root.Parse(source, this);
         }
         bool exist = false;
-        void MarkAsExist(CSSParser parser)
+        CSSParseNode MarkAsExist(string value, CSSParser parser)
         {
             exist = true;
+            return null;
         }
 
         Dictionary<string, string> currClass;

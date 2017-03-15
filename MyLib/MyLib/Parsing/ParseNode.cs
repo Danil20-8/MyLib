@@ -58,7 +58,10 @@ namespace DRLib.Parsing
                     continue;
 
                 if (transition.handler != null)
-                    transition.handler(sr.controller);
+                {
+                    var node = transition.handler(sr.value, sr.controller);
+                    if (node != null) sr.MoveTo(node);
+                }
                 if (transition.node != null)
                     sr.MoveTo(transition.node);
                 if (transition.isExit)
@@ -77,15 +80,15 @@ namespace DRLib.Parsing
         }
 
         public Transition newTransition(Tsource[] key, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, flags = flags }; }
-        public Transition newTransition(Tsource[] key, Action<Tcontroller> handler, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, handler = handler, flags = flags }; }
+        public Transition newTransition(Tsource[] key, Func<Tvalue, Tcontroller, ParseNode<Tsource, Tvalue, Tcontroller>> handler, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, handler = handler, flags = flags }; }
         public Transition newTransition(Tsource[] key, ParseNode<Tsource, Tvalue, Tcontroller> node, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, node = node, flags = flags }; }
-        public Transition newTransition(Tsource[] key, ParseNode<Tsource, Tvalue, Tcontroller> node, Action<Tcontroller> handler, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, node = node, handler = handler, flags = flags }; }
+        public Transition newTransition(Tsource[] key, ParseNode<Tsource, Tvalue, Tcontroller> node, Func<Tvalue, Tcontroller, ParseNode<Tsource, Tvalue, Tcontroller>> handler, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, node = node, handler = handler, flags = flags }; }
         public Transition[] newTransitions(params Transition[] transitions) { return transitions; }
 
-        public struct Transition
+        public class Transition
         {
             public Tsource[] key;
-            public Action<Tcontroller> handler;
+            public Func<Tvalue, Tcontroller, ParseNode<Tsource, Tvalue, Tcontroller>> handler;
             public ParseNode<Tsource, Tvalue, Tcontroller> node;
             public ParseTransitionFlags flags;
 

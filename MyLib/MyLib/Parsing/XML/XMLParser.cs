@@ -38,7 +38,7 @@ namespace DRLib.Parsing.XML
             XMLParseNode elementName = new XMLParseNode(null, null, trimChars);
             XMLParseNode elementNode = new XMLParseNode(AddElement, null, trimChars);
             XMLParseNode nestedElementsNode = new XMLParseNode(null, null, noTrim);
-            XMLParseNode closeElementNode = new XMLParseNode(SetValue, CloseElement, trimChars);
+            XMLParseNode closeElementNode = new XMLParseNode(SetValue, (value, controleer) => CloseElement(value, controleer), trimChars);
 
             XMLParseNode attributeNode = new XMLParseNode(AddAttributeName, AddAttributeValue, trimChars);
             XMLParseNode stringValue = new XMLParseNode(null, null, noTrim);
@@ -115,13 +115,10 @@ namespace DRLib.Parsing.XML
         {
             controller.AddElement(value);
         }
-        void CloseElement(XMLParseController controller)
-        {
-            controller.CloseElement();
-        }
-        void CloseElement(string value, XMLParseController controller)
+        XMLParseNode CloseElement(string value, XMLParseController controller)
         {
             controller.CloseElement(value);
+            return null;
         }
 
         void AddAttributeName(string name, XMLParseController controller)
