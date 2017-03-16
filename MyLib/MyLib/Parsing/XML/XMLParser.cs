@@ -61,7 +61,7 @@ namespace DRLib.Parsing.XML
 
             elementNode.SetTransitions(
                 elementNode.newTransitions(
-                    elementNode.newTransition(elementExitKey, CloseElement, ParseTransitionFlags.Exit ),
+                    elementNode.newTransition(elementExitKey, (value, controleer) => { controleer.CloseElement(); return null; }, ParseTransitionFlags.Exit ),
                     elementNode.newTransition(elementOpenKey, nestedElementsNode, ParseTransitionFlags.Exit ),
                     elementNode.newTransition(attributeWaitingKey, attributeNode )
                 ));

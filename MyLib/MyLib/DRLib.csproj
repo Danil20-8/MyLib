@@ -53,6 +53,7 @@
     <Compile Include="Parsing\CustomParseNode.cs" />
     <Compile Include="Parsing\IParseController.cs" />
     <Compile Include="Parsing\ParseNode.cs" />
+    <Compile Include="Parsing\SequenceReader.cs" />
     <Compile Include="Parsing\SimpleParser\CSSParseNode.cs" />
     <Compile Include="Parsing\SimpleParser\CSSParser.cs" />
     <Compile Include="Parsing\StringParseNode.cs" />

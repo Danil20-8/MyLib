@@ -10,6 +10,8 @@ namespace DRLib.Parsing
     {
         IParseValueHandler<Tsource, Tvalue> valueHandler;
         Transition[] nodes;
+        Tsource[][] keys;
+
         readonly ParseNodeFlags flags;
 
         bool ignoreEnd { get { return (flags & ParseNodeFlags.IgnoreEnd) != 0; } }
@@ -31,52 +33,53 @@ namespace DRLib.Parsing
                 if (transitions.All(t => t.isExit == false))
                     throw new Exception("Not igoring end ParseNode has to contain exit transition");
             this.nodes = transitions;
+            keys = this.nodes.Select(n => n.key).ToArray();
         }
 
         public object Parse(IEnumerable<Tsource> source, Tcontroller controller)
         {
-            var sr = new SequenceReader(source, controller);
-            sr.MoveTo(this);
-            return sr.controller.GetResult();
+            var pc = new ParseController(source, controller);
+            pc.MoveTo(this);
+            return pc.controller.GetResult();
         }
 
-        void Parse(SequenceReader sr)
+        void Parse(ParseController pc)
         {
-            EnterHandle(sr.value, sr.controller);
-            sr.ClearValues();
+            EnterHandle(pc.value, pc.controller);
+            pc.ClearValues();
 
-            while(sr.Next() != -1)
+            while(pc.Next() != -1)
             {
-                Transition transition = sr.transition;
+                Transition transition = pc.transition;
 
                 //removing key from value sequence
                 if (transition.clearKeyBuffer)
-                    sr.ClearKey();
+                    pc.ClearKey();
 
                 //if the value is meaningful
-                if (transition.noZero && !sr.hasValue)
+                if (transition.noZero && !pc.hasValue)
                     continue;
 
                 if (transition.handler != null)
                 {
-                    var node = transition.handler(sr.value, sr.controller);
-                    if (node != null) sr.MoveTo(node);
+                    var node = transition.handler(pc.value, pc.controller);
+                    if (node != null) pc.MoveTo(node);
                 }
                 if (transition.node != null)
-                    sr.MoveTo(transition.node);
+                    pc.MoveTo(transition.node);
                 if (transition.isExit)
                 {
-                    ExitHandle(sr.value, sr.controller);
+                    ExitHandle(pc.value, pc.controller);
                     return;
                 }
 
                 if (transition.clearOnBack)
-                    sr.ClearValues();
+                    pc.ClearValues();
             }
 
             if (!ignoreEnd)
                 throw new EndOfSequenceParseException();
-            ExitHandle(sr.value, sr.controller);
+            ExitHandle(pc.value, pc.controller);
         }
 
         public Transition newTransition(Tsource[] key, ParseTransitionFlags flags = ParseTransitionFlags.None) { return new Transition { key = key, flags = flags }; }
@@ -98,37 +101,27 @@ namespace DRLib.Parsing
             public bool clearKeyBuffer { get { return (flags & ParseTransitionFlags.DontClearKeyBuffer) != ParseTransitionFlags.DontClearKeyBuffer; } }
         }
 
-        class SequenceReader
+        class ParseController
         {
             public readonly Tcontroller controller;
+            SequenceReader<Tsource> sr;
 
-            List<Tsource> values = new List<Tsource>();
-            Queue<Tsource> keyBuffer = new Queue<Tsource>();
-
-            Transition[] transitions { get { return node.nodes; } }
             ParseNode<Tsource, Tvalue, Tcontroller> node;
-            List<int> hits = new List<int>();
-            int hitsLength { get { return hits.Count; } }
-
-            int maxKeyLength;
-            int transitionIndex;
-            IEnumerator<Tsource> source;
 
             Value<Tvalue> valueResult;
             public Tvalue value { get { return valueResult.value; } }
             public bool hasValue { get { return valueResult.hasValue; } }
 
-            public Transition transition { get { return transitions[transitionIndex]; } }
-            public bool isEnd { get; private set; }
+            public Transition transition { get { return node.nodes[sr.Key]; } }
 
             public void ClearValues()
             {
-                values.Clear();
+                sr.ClearValues();
             }
 
-            public SequenceReader(IEnumerable<Tsource> source, Tcontroller controller)
+            public ParseController(IEnumerable<Tsource> source, Tcontroller controller)
             {
-                this.source = source.GetEnumerator();
+                sr = new SequenceReader<Tsource>(source);
                 this.controller = controller;
             }
 
@@ -136,16 +129,12 @@ namespace DRLib.Parsing
             {
                 this.node = node;
                 if (node != null)
-                {
-                    hits.SetSize(node.nodes.Length);
-                    maxKeyLength = transitions.Max(t => t.key.Length);
-                }
+                    sr.SetKeys(node.keys);
             }
 
             public void ClearKey()
             {
-                for (int i = 0; i < transition.key.Length; ++i)
-                    keyBuffer.Dequeue();
+                sr.ClearKey();
             }
 
             public void MoveTo(ParseNode<Tsource, Tvalue, Tcontroller> node)
@@ -158,85 +147,11 @@ namespace DRLib.Parsing
 
             public int Next()
             {
-                for (;;)
-                {
-                    while (keyBuffer.Count < maxKeyLength && source.MoveNext())
-                        keyBuffer.Enqueue(source.Current);
-
-                    SetResult(CheckKeys());
-                    if (transitionIndex != -1)
-                        return transitionIndex;
-
-                    if (keyBuffer.Count == 0)
-                        break;
-
-                    AddValue(keyBuffer.Dequeue());
-                }
-                isEnd = true;
-                SetResult(-1);
-                return transitionIndex;
+                sr.Next();
+                valueResult = node.valueHandler.GetValue(sr.Result);
+                return sr.Key;
             }
 
-            void SetResult(int value)
-            {
-                transitionIndex = value;
-                if(value != -1)
-                    valueResult = node.valueHandler.GetValue(values);
-            }
-
-            void AddValue(Tsource value)
-            {
-                /*foreach (var tk in node.trimKeys)
-                    if (value.Equals(tk))
-                        return;*/
-                values.Add(value);
-            }
-
-            int CheckKeys()
-            {
-                int maxHits = 0;
-                int maxIndex = 0;
-                int miss = 0;
-
-                int count = 0;
-
-                foreach(var c in keyBuffer)
-                {
-                    if (count == maxKeyLength) // preservation of keyBuffer count greater then max key length
-                        break;
-                    for(int i = 0; i < hitsLength; ++i)
-                    {
-                        if(transitions[i].key.Length != hits[i] && hits[i] != -1)
-                        {
-                            if (transitions[i].key[hits[i]].Equals(c))
-                            {
-                                if (++hits[i] == transitions[i].key.Length)
-                                    if (maxHits < hits[i])
-                                    {
-                                        maxHits = hits[i];
-                                        maxIndex = i;
-                                    }
-                            }
-                            else {
-                                if (++miss == hitsLength - 1 && maxHits > 0)
-                                    goto ONE_OF_ALL_FOUNDED;
-
-                                hits[i] = -1;
-                            }
-                        }
-                    }
-                    ++count;
-                }
-                ONE_OF_ALL_FOUNDED:
-                ZeroHits();
-                return maxHits > 0 ? maxIndex : -1;
-            }
-
-            void ZeroHits()
-            {
-                for (int i = 0; i < hitsLength; ++i)
-                    hits[i] = 0;
-            }
         }
     }
 
@@ -267,6 +182,4 @@ namespace DRLib.Parsing
         public IEnumerable<TSource> values;
         public TSource[] key;
     }
-
-
 }
