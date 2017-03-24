@@ -1,0 +1,18 @@
+keys{
+	preNameKey = ".";
+	optionsEnterKey = "{";
+	optionsExitKey = "}";
+	waitingValueKey = "=";
+	endValueKey = ";";
+	beginStringKey = "\"";
+	endStringKey = "\"";
+}
+
+<AddClass ToEnd>
+	<AddOption enter=optionsEnterKey exit=optionsExitKey>
+		<AddOptionValue enter=waitingValueKey exit=endValueKey>
+			<AddOptionValue enter=beginStringKey exit=endStringKey>
+			</AddOptionValue>
+		</AddOptionValue>
+	</AddOption>
+</AddClass>

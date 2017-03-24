@@ -7,7 +7,7 @@ namespace DRLib.Algoriphms
 {
     public static class WithMinMax
     {
-        public static T WithMin<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector) where Tcmp : IComparable
+        public static T WithMin<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector) where Tcmp : IComparable<Tcmp>
         {
             var i = numerable.GetEnumerator();
 
@@ -32,7 +32,7 @@ namespace DRLib.Algoriphms
             return min;
 
         }
-        public static bool WithMin<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector, Predicate<T> predicate, out T result) where Tcmp : IComparable
+        public static bool WithMin<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector, Predicate<T> predicate, out T result) where Tcmp : IComparable<Tcmp>
         {
             var i = numerable.GetEnumerator();
             Tcmp curr;
@@ -65,7 +65,7 @@ namespace DRLib.Algoriphms
             result = min;
             return true;
         }
-        public static T WithMax<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector) where Tcmp : IComparable
+        public static T WithMax<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector) where Tcmp : IComparable<Tcmp>
         {
             var i = numerable.GetEnumerator();
 
@@ -89,7 +89,7 @@ namespace DRLib.Algoriphms
             i.Dispose();
             return max;
         }
-        public static bool WithMax<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector, Predicate<T> predicate, out T result) where Tcmp : IComparable
+        public static bool WithMax<T, Tcmp>(this IEnumerable<T> numerable, Func<T, Tcmp> selector, Predicate<T> predicate, out T result) where Tcmp : IComparable<Tcmp>
         {
             var i = numerable.GetEnumerator();
             Tcmp curr;
