@@ -58,6 +58,7 @@
     <Compile Include="Patterns\Observer\Sender.cs" />
     <Compile Include="Patterns\Observer\TestMessenger.cs" />
     <Compile Include="Structures\Tree\TestTreeWalker.cs" />
+    <Compile Include="Structures\Tree\TestTreeMaker.cs" />
     <Compile Include="TestAttributesSerialization.cs" />
     <Compile Include="TestNullBinder.cs" />
     <Compile Include="TestTrees.cs" />

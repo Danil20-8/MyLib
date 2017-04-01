@@ -12,7 +12,7 @@ namespace DRLib.Structures.Tree
             where TNode : IHaveParent<TNode>, IHaveChilds<TNode>, ITreemaker<TNode>
         {
             TNode r = path.Length > 0 ? self.GetNode(path) : self;
-            node.SetParent(r);
+            r.AddChild(node);
         }
         public static void RemoveChild<TNode>(this TNode self, TNode node, params int[] path)
             where TNode : IHaveChilds<TNode>, ITreemaker<TNode>
@@ -65,13 +65,6 @@ namespace DRLib.Structures.Tree
         {
             if (self.parent != null)
                 self.parent.RemoveChild(self);
-        }
-
-        public static void SetParent<TNode>(this TNode self, TNode node)
-            where TNode : IHaveParent<TNode>, ITreemaker<TNode>
-        {
-            self.Release();
-            node.AddChild(self);
         }
     }
 }

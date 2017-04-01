@@ -34,6 +34,7 @@ namespace DRLib.Structures.Tree
 
         public void AddChild(TreeNode<TItem> child)
         {
+            child.Release();
             child._parent = this;
             _childs.Add(child);
         }

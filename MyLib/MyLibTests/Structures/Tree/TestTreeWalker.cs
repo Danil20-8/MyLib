@@ -18,6 +18,16 @@ namespace MyLibTests.Structures.Tree
             Assert.AreEqual(parent.childs.First(), child);
         }
         [TestMethod]
+        public void TestAddChildOfParent()
+        {
+            TreeNode<int> parent = new TreeNode<int>(1);
+            var child = parent.AddChild(2);
+            var childOfParent = child.AddChild(3);
+            parent.AddChild(childOfParent);
+
+            Assert.AreEqual(0, child.childs.Count());
+        }
+        [TestMethod]
         public void TestAddChildToChild()
         {
             TreeNode<int> parent = new TreeNode<int>(1);
