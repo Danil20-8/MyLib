@@ -69,10 +69,17 @@
     <Compile Include="Serialization\FieldObjectTree.cs" />
     <Compile Include="Serialization\General.cs" />
     <Compile Include="Serialization\SerializationInfo.cs" />
+    <Compile Include="Structures\Arrays\ProxyArray.cs" />
     <Compile Include="Structures\CubeBounds.cs" />
+    <Compile Include="Structures\Tree\Forest.cs" />
+    <Compile Include="Structures\Tree\ITree.cs" />
     <Compile Include="Structures\LineBounds.cs" />
     <Compile Include="Patterns\Observer\Messenger.cs" />
     <Compile Include="Structures\SquareBounds.cs" />
+    <Compile Include="Structures\Tree\TreeMaker.cs" />
+    <Compile Include="Structures\Tree\TreeNode.cs" />
+    <Compile Include="Structures\Tree\TreeNumerator.cs" />
+    <Compile Include="Structures\Tree\TreeWalker.cs" />
     <Compile Include="TreeNode.cs" />
   </ItemGroup>
   <ItemGroup />
