@@ -44,6 +44,7 @@
     <Compile Include="Algoriphms\EnumerableExtends.cs" />
     <Compile Include="Algoriphms\ListExtends.cs" />
     <Compile Include="Algoriphms\Other.cs" />
+    <Compile Include="Algoriphms\SequenceProduct.cs" />
     <Compile Include="Algoriphms\TypeExtends.cs" />
     <Compile Include="Algoriphms\WithMinMax.cs" />
     <Compile Include="CustomTree.cs" />
@@ -68,6 +69,10 @@
     <Compile Include="Serialization\FieldObjectTree.cs" />
     <Compile Include="Serialization\General.cs" />
     <Compile Include="Serialization\SerializationInfo.cs" />
+    <Compile Include="Structures\CubeBounds.cs" />
+    <Compile Include="Structures\LineBounds.cs" />
+    <Compile Include="Patterns\Observer\Messenger.cs" />
+    <Compile Include="Structures\SquareBounds.cs" />
     <Compile Include="TreeNode.cs" />
   </ItemGroup>
   <ItemGroup />

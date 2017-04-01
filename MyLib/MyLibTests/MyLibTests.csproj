@@ -55,6 +55,8 @@
     <Compile Include="Algorithms\TestTypeExtends.cs" />
     <Compile Include="Parsing\TestParsing.cs" />
     <Compile Include="Parsing\TestSequenceReader.cs" />
+    <Compile Include="Patterns\Observer\Sender.cs" />
+    <Compile Include="Patterns\Observer\TestMessenger.cs" />
     <Compile Include="TestAttributesSerialization.cs" />
     <Compile Include="TestNullBinder.cs" />
     <Compile Include="TestTrees.cs" />
