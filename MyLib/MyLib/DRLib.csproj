@@ -71,6 +71,7 @@
     <Compile Include="Serialization\SerializationInfo.cs" />
     <Compile Include="Structures\Arrays\ProxyArray.cs" />
     <Compile Include="Structures\CubeBounds.cs" />
+    <Compile Include="Structures\Tree\CustomTree.cs" />
     <Compile Include="Structures\Tree\Forest.cs" />
     <Compile Include="Structures\Tree\ITree.cs" />
     <Compile Include="Structures\LineBounds.cs" />
